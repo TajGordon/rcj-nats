@@ -12,7 +12,7 @@ if host == 'storm':
     left_wall = -2430/2
     right_wall = 2430/2
     top_wall = 1820/2
-    bottom_wall = 1820/2
+    bottom_wall = -1820/2
     # goal dimensions - multiply by T[-1, 1] to get opposite goal
     goal_top_wall_y = 450/2
     goal_bottom_wall_y = -450/2

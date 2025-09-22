@@ -10,14 +10,17 @@ from adafruit_bno08x.i2c import BNO08X_I2C
 
 class IMU:
     def __init__(self, i2c = busio.I2C(board.SCL, board.SDA)):
-        # not used, just reads from the IMU over i2c - this is probably fine
-        # self.heading = 0.0
-        # radianss
-        self.angle = 0.0
-
         self.i2c = i2c
         self.bno = BNO08X_I2C(i2c)
         self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+
+        # not used, just reads from the IMU over i2c - this is probably fine
+        # self.heading = 0.0
+        # radianss
+        # self.angle = 0.0 <-- not used right now
+        # offset, to make the initialised direction 0.0
+        self.angle_offset = -self._get_angle()
+
 
     def _get_angle(self):
         # formula courtesy of chatgpt - i'll derive myself later, but it feels like solving using full matrix expansion would be tedious
@@ -28,6 +31,9 @@ class IMU:
     def _read_quat(self):
         i, j, k, w = self.bno.quaternion # type: ignore[reportAttributeAccessIssue]
         return i,j,k,w
+    
+    def cur_angle(self):
+        return self._get_angle() + self.angle_offset
 
 
 

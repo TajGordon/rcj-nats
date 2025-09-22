@@ -6,10 +6,13 @@ import busio
 READ_REG = 0x10
 
 class ToF:
-    def __init__(self, addr, i2c = busio.I2C(board.SCL, board.SDA)):
+    def __init__(self, addr, offset, angle, i2c = busio.I2C(board.SCL, board.SDA)):
         self.i2c = i2c
         self.addr = addr
         
+        self.offset = offset
+        self.angle = angle
+
         # TODO! set to use data from config.py
         self.max_distance = 1000
         self.min_distance = 10

@@ -2,6 +2,7 @@ import time
 import math
 import board
 import busio
+import tajslib
 from adafruit_bno08x import (
     BNO_REPORT_ROTATION_VECTOR,
 )
@@ -19,7 +20,10 @@ class IMU:
         # radianss
         # self.angle = 0.0 <-- not used right now
         # offset, to make the initialised direction 0.0
-        self.angle_offset = -self._get_angle()
+        time.sleep(0.04) # delay to make sure the IMU is initialized
+        i, j, k, w = self.bno.quaternion  # type: ignore[reportAttributeAccessIssue]
+        self.angle_offset = -(math.atan2(2*(w*k + i*j), 1 - 2 * (j*j + k*k)))
+        # self.angle_offset = -self._get_angle()
 
 
     def _get_angle(self):
@@ -33,8 +37,7 @@ class IMU:
         return i,j,k,w
     
     def cur_angle(self):
-        return self._get_angle() + self.angle_offset
-
+        return tajslib.add_radians(self._get_angle(), self.angle_offset)
 
 
 # test code
@@ -49,12 +52,15 @@ if __name__ == "__main__":
     sw = col4.metric("W", 0)
     
     sa = st.metric(label='Angle', value="0.0 °", delta="0.0 °")
+    sra = st.metric(label='Raw Angle', value="0.0 °")
     
     from collections import deque
     delta_points = deque(maxlen=1000)
     angle_points = deque(maxlen=1000)
+    raw_angle_points = deque(maxlen=1000)
 
     delta_placeholder = st.line_chart(delta_points)
+    raw_angle_placeholder = st.line_chart(raw_angle_points)
     angle_placeholder = st.line_chart(angle_points)
     
     def get_diff(a, b):
@@ -67,6 +73,8 @@ if __name__ == "__main__":
 
     # imu setup
     imu = IMU()
+
+
     previous_angle = 0.0
     while True:
         # the raw quat stuff
@@ -77,13 +85,17 @@ if __name__ == "__main__":
         sw.metric('W', w)
         
         # the angle
-        angle = imu._get_angle()
-        delta_angle = get_diff(angle, previous_angle)
-        sa.metric(label="Angle", value=f"{math.degrees(angle):.2f} °", delta=f"{math.degrees(delta_angle):.2f} °")
-        previous_angle = angle
+        raw_angle = imu._get_angle()
+        cur_angle = imu.cur_angle()
+        delta_angle = get_diff(cur_angle, previous_angle)
+        sa.metric(label="Angle", value=f"{math.degrees(cur_angle):.2f} °", delta=f"{math.degrees(delta_angle):.2f} °")
+        sra.metric(label="Raw Angle", value=f"{math.degrees(raw_angle):.2f} °")
+        previous_angle = cur_angle
         
         delta_points.append(math.degrees(delta_angle))
-        angle_points.append(math.degrees(angle))
+        raw_angle_points.append(math.degrees(raw_angle))
+        angle_points.append(math.degrees(cur_angle))
         
+        raw_angle_placeholder.line_chart(raw_angle_points)
         angle_placeholder.line_chart(angle_points)
         delta_placeholder.line_chart(delta_points)

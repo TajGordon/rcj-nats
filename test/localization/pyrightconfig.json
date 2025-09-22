@@ -1,0 +1,6 @@
+{
+    "venvPath": "/home/hyperion",
+    "venv": "env",
+    "pythonVersion": "3.11",
+    "typeCheckingMode": "standard"
+}

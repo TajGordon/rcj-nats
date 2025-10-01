@@ -84,6 +84,9 @@ class Motor:
             speed = -1.0
         self.driver.set_speed(int(self._speed_limit * speed))
 
+    def stop(self):
+        self.set_speed(0)
+
     def read(self):
         self.driver.update_quick_data_readout()
         position = self.driver.get_position_QDR()

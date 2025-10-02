@@ -83,8 +83,8 @@ class MockLocalizer:
         dx = math.cos(angle)
         dy = math.sin(angle)
         for wall in config.walls:
-            if wall['type'] == 'horizontal':
-                t = (wall['y'] - position[1]) / dy  # Fixed: should be position[1] for y
+            if wall['type'] == 'horizontal': 
+                t = (wall['y'] - position[1]) / dy  if dy != 0 else float('inf') # Fixed: should be position[1] for y
                 if t <= 0:
                     continue
                 x = position[0] + t * dx
@@ -95,7 +95,7 @@ class MockLocalizer:
                 if dist_squared < minimum_distance:
                     minimum_distance = dist_squared
             else:  # vertical wall
-                t = (wall['x'] - position[0]) / dx  # Fixed: should be position[0] for x
+                t = (wall['x'] - position[0]) / dx  if dx != 0 else float('inf') # Fixed: should be position[0] for x
                 if t <= 0:
                     continue
                 y = position[1] + t * dy

@@ -1,17 +1,24 @@
 import config
+import board
 from tof import ToF
 from imu import IMU
 
 import math
 
 class Localizer:
-    def __init__(self, i2c, tofs=None, imu=None):
-        self.tofs = []
+    def __init__(self, i2c = board.I2C(board.SCL, board.SDA), tofs=None, imu=IMU(i2c=board.I2C(board.SCL, board.SDA))):
+        self.tofs = tofs if tofs is not None else []
         self.tof_angles = [] # used to key for distances
         self.tof_distances = {} # angle -> distance
+        # initialize tofs if not provided, this lets us fake the tofs
+        if tofs is None:
+            for addr in config.tof_addrs:
+                self.tofs.append(ToF(addr=addr, offset=config.tof_offsets[addr], angle=config.tof_angles[addr], i2c=i2c))
+                self.tof_angles.append(self.tofs[-1].angle)
+                self.tof_distances[self.tof_angles[-1]] = 0 # default value
         
         # get angle from the imu, just call 'cur_angle()'
-        self.imu = IMU(i2c=i2c)
+        self.imu = imu
 
         # for debug stuff (mainly for simulator)
         if tofs is not None:
@@ -22,10 +29,6 @@ class Localizer:
         self.best_guess = [0, 0] # list because fk python tuples
         self.best_error = float('inf')
         
-        for addr in config.tof_addrs:
-            self.tofs.append(ToF(addr=addr, offset=config.tof_offsets[addr], angle=config.tof_angles[addr], i2c=i2c))
-            self.tof_angles.append(self.tofs[-1].angle)
-            self.tof_distances[self.tof_angles[-1]] = 0 # default value
     
     def _update_distances(self):
         for tof in self.tofs:
@@ -105,9 +108,16 @@ class Localizer:
                         error = self._compute_error(guess_pos, angle)
                         if error < self.best_error:
                             converged = False
-                            best_error = error
-                            best_guess = guess_pos
+                            self.best_error = error
+                            self.best_guess = guess_pos
             move_amount *= decay_rate
         
         # now should be able to just do localizer.best_guess, but will return the position as well jsut in case
         return self.best_guess, self.best_error
+
+
+if __name__ == "__main__":
+    from fake_sensors import FakeIMU as IMU, FakeToF as ToF
+    fake_tofs = [ToF(addr=0, angle=0, offset=(0, 0)), ToF(addr=1, angle=45, offset=(0, 0)), ToF(addr=2, angle=90, offset=(0, 0)), ToF(addr=3, angle=135, offset=(0, 0)), ToF(addr=4, angle=180, offset=(0, 0)), ToF(addr=5, angle=-135, offset=(0, 0)), ToF(addr=6, angle=-90, offset=(0, 0)), ToF(addr=7, angle=-45, offset=(0, 0))]
+    localizer = Localizer(imu=IMU(), tofs=fake_tofs)
+    pass # TODO: implement like in localizer_simulator_tester.py

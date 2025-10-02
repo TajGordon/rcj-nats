@@ -10,7 +10,7 @@ DEBUG_LOCALIZATION = False
 # Global test angles for localization
 import random
 import math
-random.seed(42)  # For reproducible results
+# random.seed(42)  # For reproducible results
 TEST_ANGLES = []
 # Add some common angles first
 TEST_ANGLES.extend([0, 45, 90, 135, 180, -45, -90, -135])
@@ -51,7 +51,8 @@ class FakeToF:
         import math
         
         # Calculate absolute angle of sensor relative to field
-        absolute_angle = robot_angle + self.angle
+        real_absolute_angle = robot_angle + self.angle
+        absolute_angle = real_absolute_angle + (random.uniform(-1, 1) * 0.01 * real_absolute_angle)
         
         # Robot position
         robot_x, robot_y = robot_pos

@@ -44,9 +44,7 @@ class Motor:
         self.driver.configure_operating_mode_and_sensor(3, 1)  # FOC + sin/cos encoder
         self.driver.configure_command_mode(12)  # speed mode
 
-    def _set_rps(self, rps):
-        pass
-
+    # the juicy function
     def set_speed(self, speed):
         # speed expected in range [-10.0, 10.0]; scale to controller units
         if speed is None:
@@ -108,19 +106,65 @@ if __name__ == "__main__":
             ticks += 1
         motors[4].set_speed(0)
 
-        try:
-            import matplotlib.pyplot as plt
-            plt.figure(figsize=(8, 4))
-            plt.plot(times, measured_speed_log, marker='o', label='Measured Speed')
-            plt.plot(times, set_speed_log, linestyle='--', color='gray', label='Ideal (y=x)')
-            plt.xlabel('Time ticks (0.1s)')
-            plt.ylabel('Normalized Speed')
-            plt.title('Motor Set Speed vs. Measured Speed')
-            plt.legend()
-            plt.grid(True)
-            plt.show()
-        except Exception as e:
-            print(f"Plotting skipped: {e}")
+        # Save data for Streamlit visualization
+        import json
+        data = {
+            'times': times,
+            'set_speed': set_speed_log,
+            'measured_speed': measured_speed_log
+        }
+        with open('motor_test_data.json', 'w') as f:
+            json.dump(data, f)
+        print("Motor test complete. Run 'streamlit run motor.py' to view results.")
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    def streamlit_dashboard():
+        import streamlit as st
+        import pandas as pd
+        import json
+        import os
+        
+        st.title('Motor Performance Dashboard')
+        st.markdown('### Motor Set Speed vs. Measured Speed')
+        
+        # Try to load test data
+        if os.path.exists('motor_test_data.json'):
+            with open('motor_test_data.json', 'r') as f:
+                data = json.load(f)
+            
+            df = pd.DataFrame({
+                'Time (0.1s ticks)': data['times'],
+                'Set Speed': data['set_speed'],
+                'Measured Speed': data['measured_speed']
+            })
+            
+            # Display metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Last Set Speed", f"{data['set_speed'][-1]:.2f}")
+            with col2:
+                st.metric("Last Measured Speed", f"{data['measured_speed'][-1]:.2f}")
+            with col3:
+                error = abs(data['set_speed'][-1] - data['measured_speed'][-1])
+                st.metric("Speed Error", f"{error:.3f}")
+            
+            # Line chart
+            st.line_chart(df.set_index('Time (0.1s ticks)'))
+            
+            # Raw data table (expandable)
+            with st.expander("Raw Test Data"):
+                st.dataframe(df)
+                
+        else:
+            st.warning("No test data found. Run the motor test first!")
+            if st.button("Run Motor Test"):
+                st.info("Please run this script normally (python motor.py) to collect test data first.")
+
+    # Check if running in Streamlit context
+    import sys
+    import os
+    if 'streamlit' in sys.modules or 'STREAMLIT_SERVER_PORT' in os.environ:
+        streamlit_dashboard()
+    else:
+        # Normal execution - run the motor test
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())

@@ -1,0 +1,22 @@
+{
+    "title": "Pico Test Song",
+    "duration": 5000,
+    "lines": [
+        [
+            {"note": "C4", "start": 0, "duration": 400},
+            {"note": "D4", "start": 500, "duration": 400},
+            {"note": "E4", "start": 1000, "duration": 400},
+            {"note": "F4", "start": 1500, "duration": 400},
+            {"note": "G4", "start": 2000, "duration": 400},
+            {"note": "A4", "start": 2500, "duration": 400},
+            {"note": "B4", "start": 3000, "duration": 400},
+            {"note": "C5", "start": 3500, "duration": 400}
+        ],
+        [
+            {"note": "C3", "start": 250, "duration": 750},
+            {"note": "F3", "start": 1250, "duration": 750},
+            {"note": "G3", "start": 2250, "duration": 750},
+            {"note": "C4", "start": 3250, "duration": 750}
+        ]
+    ]
+}

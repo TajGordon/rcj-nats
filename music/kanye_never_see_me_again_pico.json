@@ -1,0 +1,242 @@
+{
+  "title": "Never See Me Again Kanye (Timing Fixed) (3 Piezos)",
+  "duration": 90000,
+  "lines": [
+    [
+      {
+        "note": "FS3",
+        "start": 0,
+        "duration": 352
+      },
+      {
+        "note": "FS2",
+        "start": 2608,
+        "duration": 352
+      },
+      {
+        "note": "CS3",
+        "start": 3913,
+        "duration": 352
+      },
+      {
+        "note": "B2",
+        "start": 6521,
+        "duration": 352
+      },
+      {
+        "note": "B2",
+        "start": 9130,
+        "duration": 352
+      },
+      {
+        "note": "AS2",
+        "start": 13043,
+        "duration": 352
+      },
+      {
+        "note": "DS2",
+        "start": 15652,
+        "duration": 352
+      },
+      {
+        "note": "DS3",
+        "start": 16956,
+        "duration": 352
+      },
+      {
+        "note": "DS2",
+        "start": 18260,
+        "duration": 352
+      },
+      {
+        "note": "GS1",
+        "start": 19565,
+        "duration": 352
+      },
+      {
+        "note": "DS2",
+        "start": 20869,
+        "duration": 352
+      },
+      {
+        "note": "C2",
+        "start": 22173,
+        "duration": 352
+      },
+      {
+        "note": "CS2",
+        "start": 23478,
+        "duration": 352
+      },
+      {
+        "note": "CS2",
+        "start": 24782,
+        "duration": 352
+      }
+    ],
+    [
+      {
+        "note": "CS3",
+        "start": 0,
+        "duration": 352
+      },
+      {
+        "note": "E3",
+        "start": 2608,
+        "duration": 352
+      },
+      {
+        "note": "FS3",
+        "start": 6521,
+        "duration": 352
+      },
+      {
+        "note": "FS3",
+        "start": 7826,
+        "duration": 352
+      },
+      {
+        "note": "FS3",
+        "start": 11739,
+        "duration": 352
+      },
+      {
+        "note": "D3",
+        "start": 13043,
+        "duration": 352
+      },
+      {
+        "note": "DS2",
+        "start": 15652,
+        "duration": 352
+      },
+      {
+        "note": "DS2",
+        "start": 16956,
+        "duration": 352
+      },
+      {
+        "note": "DS3",
+        "start": 18260,
+        "duration": 352
+      },
+      {
+        "note": "GS2",
+        "start": 19565,
+        "duration": 352
+      },
+      {
+        "note": "GS1",
+        "start": 20869,
+        "duration": 352
+      },
+      {
+        "note": "B1",
+        "start": 22173,
+        "duration": 352
+      },
+      {
+        "note": "CS2",
+        "start": 23478,
+        "duration": 352
+      },
+      {
+        "note": "CS2",
+        "start": 24782,
+        "duration": 352
+      }
+    ],
+    [
+      {
+        "note": "CS4",
+        "start": 0,
+        "duration": 352
+      },
+      {
+        "note": "CS4",
+        "start": 1304,
+        "duration": 352
+      },
+      {
+        "note": "CS4",
+        "start": 2608,
+        "duration": 352
+      },
+      {
+        "note": "E4",
+        "start": 3913,
+        "duration": 352
+      },
+      {
+        "note": "CS4",
+        "start": 5217,
+        "duration": 352
+      },
+      {
+        "note": "DS4",
+        "start": 6521,
+        "duration": 352
+      },
+      {
+        "note": "F4",
+        "start": 7826,
+        "duration": 352
+      },
+      {
+        "note": "DS4",
+        "start": 9130,
+        "duration": 352
+      },
+      {
+        "note": "B3",
+        "start": 11739,
+        "duration": 352
+      },
+      {
+        "note": "AS3",
+        "start": 13043,
+        "duration": 352
+      },
+      {
+        "note": "CS5",
+        "start": 14347,
+        "duration": 352
+      },
+      {
+        "note": "B4",
+        "start": 15652,
+        "duration": 352
+      },
+      {
+        "note": "CS4",
+        "start": 16956,
+        "duration": 352
+      },
+      {
+        "note": "AS3",
+        "start": 18260,
+        "duration": 352
+      },
+      {
+        "note": "B3",
+        "start": 19565,
+        "duration": 352
+      },
+      {
+        "note": "FS4",
+        "start": 20869,
+        "duration": 352
+      },
+      {
+        "note": "B4",
+        "start": 23478,
+        "duration": 352
+      },
+      {
+        "note": "DS4",
+        "start": 24782,
+        "duration": 352
+      }
+    ]
+  ]
+}

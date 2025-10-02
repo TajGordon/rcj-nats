@@ -1,0 +1,20 @@
+{
+  "title": "Never See Me Again Kanye",
+  "duration": 20,
+  "lines": [
+    [
+      {
+        "note": "FS3",
+        "start": 0,
+        "duration": 50
+      }
+    ],
+    [
+      {
+        "note": "CS5",
+        "start": 11,
+        "duration": 50
+      }
+    ]
+  ]
+}

@@ -1,0 +1,542 @@
+{
+  "title": "Never See Me Again Kanye",
+  "duration": 20,
+  "lines": [
+    [
+      {
+        "note": "FS2",
+        "start": 0,
+        "duration": 50
+      },
+      {
+        "note": "FS2",
+        "start": 2,
+        "duration": 50
+      },
+      {
+        "note": "B2",
+        "start": 5,
+        "duration": 50
+      },
+      {
+        "note": "FS3",
+        "start": 7,
+        "duration": 50
+      },
+      {
+        "note": "F3",
+        "start": 10,
+        "duration": 50
+      },
+      {
+        "note": "DS3",
+        "start": 12,
+        "duration": 50
+      },
+      {
+        "note": "DS3",
+        "start": 13,
+        "duration": 50
+      },
+      {
+        "note": "GS1",
+        "start": 15,
+        "duration": 50
+      },
+      {
+        "note": "AS1",
+        "start": 17,
+        "duration": 50
+      },
+      {
+        "note": "CS2",
+        "start": 18,
+        "duration": 50
+      }
+    ],
+    [
+      {
+        "note": "FS3",
+        "start": 0,
+        "duration": 50
+      },
+      {
+        "note": "CS3",
+        "start": 3,
+        "duration": 50
+      },
+      {
+        "note": "B2",
+        "start": 7,
+        "duration": 50
+      },
+      {
+        "note": "AS2",
+        "start": 10,
+        "duration": 50
+      },
+      {
+        "note": "DS2",
+        "start": 12,
+        "duration": 50
+      },
+      {
+        "note": "DS2",
+        "start": 14,
+        "duration": 50
+      },
+      {
+        "note": "DS2",
+        "start": 16,
+        "duration": 50
+      },
+      {
+        "note": "C2",
+        "start": 17,
+        "duration": 50
+      },
+      {
+        "note": "CS2",
+        "start": 19,
+        "duration": 50
+      }
+    ],
+    [
+      {
+        "note": "CS3",
+        "start": 0,
+        "duration": 50
+      },
+      {
+        "note": "FS3",
+        "start": 5,
+        "duration": 50
+      },
+      {
+        "note": "FS3",
+        "start": 9,
+        "duration": 50
+      },
+      {
+        "note": "DS2",
+        "start": 12,
+        "duration": 50
+      },
+      {
+        "note": "DS3",
+        "start": 14,
+        "duration": 50
+      },
+      {
+        "note": "GS1",
+        "start": 16,
+        "duration": 50
+      },
+      {
+        "note": "CS2",
+        "start": 18,
+        "duration": 50
+      }
+    ],
+    [
+      {
+        "note": "E3",
+        "start": 2,
+        "duration": 50
+      },
+      {
+        "note": "FS3",
+        "start": 6,
+        "duration": 50
+      },
+      {
+        "note": "D3",
+        "start": 10,
+        "duration": 50
+      },
+      {
+        "note": "DS2",
+        "start": 13,
+        "duration": 50
+      },
+      {
+        "note": "GS2",
+        "start": 15,
+        "duration": 50
+      },
+      {
+        "note": "B1",
+        "start": 17,
+        "duration": 50
+      },
+      {
+        "note": "CS2",
+        "start": 19,
+        "duration": 50
+      }
+    ],
+    [
+      {
+        "note": "FS4",
+        "start": 0,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 0,
+        "duration": 50
+      },
+      {
+        "note": "AS3",
+        "start": 0,
+        "duration": 50
+      },
+      {
+        "note": "AS4",
+        "start": 1,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 1,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 1,
+        "duration": 50
+      },
+      {
+        "note": "AS3",
+        "start": 2,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 3,
+        "duration": 50
+      },
+      {
+        "note": "GS4",
+        "start": 4,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 4,
+        "duration": 50
+      },
+      {
+        "note": "AS3",
+        "start": 5,
+        "duration": 50
+      },
+      {
+        "note": "GS4",
+        "start": 6,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 7,
+        "duration": 50
+      },
+      {
+        "note": "GS3",
+        "start": 7,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 9,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 10,
+        "duration": 50
+      },
+      {
+        "note": "CS5",
+        "start": 11,
+        "duration": 50
+      },
+      {
+        "note": "F4",
+        "start": 12,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 12,
+        "duration": 50
+      },
+      {
+        "note": "GS4",
+        "start": 12,
+        "duration": 50
+      },
+      {
+        "note": "AS3",
+        "start": 13,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 14,
+        "duration": 50
+      },
+      {
+        "note": "DS4",
+        "start": 15,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 16,
+        "duration": 50
+      },
+      {
+        "note": "DS4",
+        "start": 18,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 18,
+        "duration": 50
+      },
+      {
+        "note": "AS4",
+        "start": 18,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 19,
+        "duration": 50
+      },
+      {
+        "note": "DS4",
+        "start": 19,
+        "duration": 50
+      },
+      {
+        "note": "B3",
+        "start": 19,
+        "duration": 50
+      }
+    ],
+    [
+      {
+        "note": "CS4",
+        "start": 0,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 1,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 2,
+        "duration": 50
+      },
+      {
+        "note": "E4",
+        "start": 3,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 4,
+        "duration": 50
+      },
+      {
+        "note": "DS4",
+        "start": 5,
+        "duration": 50
+      },
+      {
+        "note": "F4",
+        "start": 6,
+        "duration": 50
+      },
+      {
+        "note": "DS4",
+        "start": 7,
+        "duration": 50
+      },
+      {
+        "note": "B3",
+        "start": 9,
+        "duration": 50
+      },
+      {
+        "note": "AS3",
+        "start": 10,
+        "duration": 50
+      },
+      {
+        "note": "B4",
+        "start": 12,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 13,
+        "duration": 50
+      },
+      {
+        "note": "AS3",
+        "start": 14,
+        "duration": 50
+      },
+      {
+        "note": "B3",
+        "start": 15,
+        "duration": 50
+      },
+      {
+        "note": "B4",
+        "start": 18,
+        "duration": 50
+      },
+      {
+        "note": "DS4",
+        "start": 19,
+        "duration": 50
+      }
+    ],
+    [
+      {
+        "note": "AS3",
+        "start": 0,
+        "duration": 50
+      },
+      {
+        "note": "GS4",
+        "start": 1,
+        "duration": 50
+      },
+      {
+        "note": "E4",
+        "start": 2,
+        "duration": 50
+      },
+      {
+        "note": "AS4",
+        "start": 3,
+        "duration": 50
+      },
+      {
+        "note": "E4",
+        "start": 4,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 6,
+        "duration": 50
+      },
+      {
+        "note": "D4",
+        "start": 7,
+        "duration": 50
+      },
+      {
+        "note": "GS4",
+        "start": 10,
+        "duration": 50
+      },
+      {
+        "note": "AS4",
+        "start": 12,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 13,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 15,
+        "duration": 50
+      },
+      {
+        "note": "GS4",
+        "start": 18,
+        "duration": 50
+      },
+      {
+        "note": "B3",
+        "start": 19,
+        "duration": 50
+      }
+    ],
+    [
+      {
+        "note": "FS4",
+        "start": 0,
+        "duration": 50
+      },
+      {
+        "note": "CS4",
+        "start": 1,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 2,
+        "duration": 50
+      },
+      {
+        "note": "E4",
+        "start": 4,
+        "duration": 50
+      },
+      {
+        "note": "AS4",
+        "start": 6,
+        "duration": 50
+      },
+      {
+        "note": "B3",
+        "start": 7,
+        "duration": 50
+      },
+      {
+        "note": "F4",
+        "start": 10,
+        "duration": 50
+      },
+      {
+        "note": "GS4",
+        "start": 12,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 14,
+        "duration": 50
+      },
+      {
+        "note": "GS3",
+        "start": 15,
+        "duration": 50
+      },
+      {
+        "note": "DS4",
+        "start": 18,
+        "duration": 50
+      },
+      {
+        "note": "FS4",
+        "start": 19,
+        "duration": 50
+      }
+    ]
+  ]
+}

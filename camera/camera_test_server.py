@@ -3,7 +3,6 @@ from picamera2 import Picamera2
 import cv2
 import asyncio
 from fastapi import FastAPI, WebSocket
-import uvicorn
 
 class Camera:
     def __init__(self):

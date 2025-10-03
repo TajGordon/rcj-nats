@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Robot Localization Field</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f0f0f0;
+            }
+            
+            h1 {
+                text-align: center;
+                color: #333;
+                margin-bottom: 10px;
+            }
+            
+            .info-panel {
+                text-align: center;
+                background-color: white;
+                padding: 15px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            }
+            
+            .position-info {
+                display: flex;
+                justify-content: center;
+                gap: 30px;
+                flex-wrap: wrap;
+            }
+            
+            .metric {
+                background-color: #f8f9fa;
+                padding: 10px 20px;
+                border-radius: 5px;
+                border-left: 4px solid #007bff;
+            }
+            
+            .metric-label {
+                font-weight: bold;
+                color: #666;
+                font-size: 14px;
+            }
+            
+            .metric-value {
+                font-size: 18px;
+                color: #333;
+                margin-top: 5px;
+            }
+            
+            .canvas-container {
+                text-align: center;
+            }
+            
+            canvas {
+                border: 2px solid #333;
+                background-color: white;
+                border-radius: 5px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            
+            .connection-status {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                padding: 10px 15px;
+                border-radius: 20px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            
+            .connected {
+                background-color: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            
+            .disconnected {
+                background-color: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="connection-status disconnected" id="connectionStatus">
+            Disconnected
+        </div>
+        
+        <h1>🤖 Robot Localization Field</h1>
+        
+        <div class="info-panel">
+            <div class="position-info">
+                <div class="metric">
+                    <div class="metric-label">X Position</div>
+                    <div class="metric-value" id="posX">-- mm</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Y Position</div>
+                    <div class="metric-value" id="posY">-- mm</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Angle</div>
+                    <div class="metric-value" id="angle">-- °</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Error</div>
+                    <div class="metric-value" id="error">--</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Last Update</div>
+                    <div class="metric-value" id="timestamp">--</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="fieldCanvas" width="800" height="600"></canvas>
+        </div>
+        
+        <script src="/static/js/field.js"></script>
+    </body>
+</html>

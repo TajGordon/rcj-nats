@@ -117,7 +117,142 @@ class Localizer:
 
 
 if __name__ == "__main__":
-    from fake_sensors import FakeIMU as IMU, FakeToF as ToF
-    fake_tofs = [ToF(addr=0, angle=0, offset=(0, 0)), ToF(addr=1, angle=45, offset=(0, 0)), ToF(addr=2, angle=90, offset=(0, 0)), ToF(addr=3, angle=135, offset=(0, 0)), ToF(addr=4, angle=180, offset=(0, 0)), ToF(addr=5, angle=-135, offset=(0, 0)), ToF(addr=6, angle=-90, offset=(0, 0)), ToF(addr=7, angle=-45, offset=(0, 0))]
-    localizer = Localizer(imu=IMU(), tofs=fake_tofs)
-    pass # TODO: implement like in localizer_simulator_tester.py
+    import asyncio
+    import websockets
+    import json
+    import time
+    from tof import ToF
+    from imu import IMU
+    
+    print("🤖 Starting real hardware localization system...")
+    
+    # Initialize real hardware components
+    try:
+        print("🔧 Initializing I2C bus...")
+        i2c = board.I2C(board.SCL, board.SDA)
+        
+        print("🧭 Initializing IMU...")
+        imu = IMU(i2c=i2c)
+        
+        print("📡 Initializing ToF sensors...")
+        # Create ToF sensors based on config
+        tofs = []
+        if config.tof_addrs:  # Use config if available
+            for addr in config.tof_addrs:
+                offset = config.tof_offsets.get(addr, (0, 0))
+                angle = config.tof_angles.get(addr, 0)
+                tof = ToF(addr=addr, offset=offset, angle=math.radians(angle), i2c=i2c)
+                tofs.append(tof)
+                print(f"  ✅ ToF sensor at 0x{addr:02x}, angle {angle}°")
+        else:
+            print("⚠️  No ToF configuration found in config.py")
+            print("  Using default sensor configuration...")
+            # Default configuration for testing
+            default_config = [
+                (0x29, 0),    # Front
+                (0x2A, 45),   # Front-right  
+                (0x2B, 90),   # Right
+                (0x2C, 135),  # Back-right
+                (0x2D, 180),  # Back
+                (0x2E, -135), # Back-left
+                (0x2F, -90),  # Left
+                (0x30, -45),  # Front-left
+            ]
+            
+            for addr, angle in default_config:
+                try:
+                    tof = ToF(addr=addr, offset=(0, 0), angle=math.radians(angle), i2c=i2c)
+                    tofs.append(tof)
+                    print(f"  ✅ ToF sensor at 0x{addr:02x}, angle {angle}°")
+                except Exception as e:
+                    print(f"  ❌ Failed to initialize ToF at 0x{addr:02x}: {e}")
+        
+        print(f"📊 Initialized {len(tofs)} ToF sensors")
+        
+        # Create localizer with real hardware
+        localizer = Localizer(i2c=i2c, tofs=tofs, imu=imu)
+        print("✅ Localizer initialized successfully!")
+        
+    except Exception as e:
+        print(f"❌ Hardware initialization failed: {e}")
+        print("🔧 Please check your hardware connections and try again")
+        exit(1)
+    
+    # WebSocket client to send data to server
+    async def send_localization_data():
+        uri = "ws://localhost:8002/ws/localization"
+        max_retries = 5
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                print(f"🌐 Connecting to localization server at {uri}...")
+                async with websockets.connect(uri) as websocket:
+                    print("✅ Connected to localization server!")
+                    retry_count = 0  # Reset retry count on successful connection
+                    
+                    while True:
+                        try:
+                            # Perform localization
+                            start_time = time.time()
+                            position, error = localizer.localize()
+                            angle = localizer.imu.cur_angle()
+                            localization_time = time.time() - start_time
+                            
+                            # Prepare data to send
+                            data = {
+                                'position': position,
+                                'angle': angle,
+                                'error': error,
+                                'timestamp': time.time(),
+                                'localization_time_ms': localization_time * 1000
+                            }
+                            
+                            # Send data to server
+                            await websocket.send(json.dumps(data))
+                            
+                            # Print status
+                            print(f"📍 Position: ({position[0]:.1f}, {position[1]:.1f}) mm, "
+                                  f"Angle: {math.degrees(angle):.1f}°, "
+                                  f"Error: {error:.2f}, "
+                                  f"Time: {localization_time*1000:.1f}ms")
+                            
+                            # Wait before next localization
+                            await asyncio.sleep(0.1)  # 10 Hz update rate
+                            
+                        except Exception as e:
+                            print(f"❌ Localization error: {e}")
+                            await asyncio.sleep(1)  # Wait before retrying
+                            
+            except (websockets.exceptions.ConnectionClosed, 
+                    websockets.exceptions.InvalidURI,
+                    ConnectionRefusedError) as e:
+                retry_count += 1
+                print(f"🔄 Connection failed (attempt {retry_count}/{max_retries}): {e}")
+                if retry_count < max_retries:
+                    wait_time = min(2 ** retry_count, 30)  # Exponential backoff, max 30s
+                    print(f"⏳ Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    print("❌ Max retries exceeded. Please check if the server is running.")
+                    break
+            except Exception as e:
+                print(f"❌ Unexpected error: {e}")
+                await asyncio.sleep(5)
+    
+    # Run the localization system
+    print("🚀 Starting localization loop...")
+    print("💡 Make sure the localization server is running:")
+    print("   cd localization_server && python main.py")
+    print("📱 View results at: http://localhost:8002")
+    print("🛑 Press Ctrl+C to stop")
+    
+    try:
+        asyncio.run(send_localization_data())
+    except KeyboardInterrupt:
+        print("\n🛑 Localization system stopped by user")
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
+    finally:
+        print("🔧 Cleaning up hardware...")
+        # Add any necessary cleanup code here

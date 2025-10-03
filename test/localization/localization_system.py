@@ -20,11 +20,45 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import uvicorn
 
-# Hardware imports
-import config
-import board
-from tof import ToF
-from imu import IMU
+# Hardware imports with proper path handling
+import sys
+import os
+
+# Add current directory to Python path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
+try:
+    import config
+except ImportError:
+    print("⚠️  config.py not found, using defaults")
+    config = None
+
+try:
+    import board
+    from tof import ToF
+    from imu import IMU
+    HARDWARE_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  Hardware imports failed: {e}")
+    print("   Running in simulation mode")
+    HARDWARE_AVAILABLE = False
+    # Create mock classes for testing
+    class MockBoard:
+        class I2C:
+            def __init__(self, scl, sda): pass
+        SCL = SDA = None
+    class MockToF:
+        def __init__(self, *args, **kwargs): 
+            self.angle = kwargs.get('angle', 0)
+        def next_dist(self): return 500  # Mock distance
+    class MockIMU:
+        def __init__(self, *args, **kwargs): pass
+        def cur_angle(self): return 0.0  # Mock angle
+    
+    board = MockBoard()
+    ToF = MockToF
+    IMU = MockIMU
 
 # Global data store for sharing between localization and web server
 latest_data: Dict[str, Any] = {
@@ -280,7 +314,7 @@ class LocalizationSystem:
             print("📡 Initializing ToF sensors...")
             tofs = []
             
-            if hasattr(config, 'tof_addrs') and config.tof_addrs:
+            if config and hasattr(config, 'tof_addrs') and config.tof_addrs:
                 # Use config if available
                 for addr in config.tof_addrs:
                     try:
@@ -305,11 +339,35 @@ class LocalizationSystem:
                         print(f"  ⚠️  Skipping ToF at 0x{addr:02x}: {e}")
             
             if not tofs:
-                raise Exception("No ToF sensors initialized!")
+                if HARDWARE_AVAILABLE:
+                    raise Exception("No ToF sensors initialized!")
+                else:
+                    # Create mock sensors for testing
+                    for addr, angle_deg in [(0x29, 0), (0x2A, 90)]:
+                        tof = ToF(addr=addr, offset=(0, 0), angle=math.radians(angle_deg))
+                        tofs.append(tof)
+                    print("  🔧 Using mock sensors for testing")
             
-            # Create localizer
-            from localizer import Localizer
-            self.localizer = Localizer(i2c=i2c, tofs=tofs, imu=imu)
+            # Create localizer - handle import properly
+            try:
+                from localizer import Localizer
+            except ImportError:
+                # Try different import paths
+                localizer_path = os.path.join(current_dir, "localizer.py")
+                if os.path.exists(localizer_path):
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location("localizer", localizer_path)
+                    if spec and spec.loader:
+                        localizer_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(localizer_module)
+                        Localizer = localizer_module.Localizer
+                    else:
+                        raise ImportError("Could not load localizer module")
+                else:
+                    raise ImportError(f"localizer.py not found at {localizer_path}")
+            
+            # Create localizer instance (type: ignore for mock compatibility)
+            self.localizer = Localizer(i2c=i2c, tofs=tofs, imu=imu)  # type: ignore
             
             latest_data.update({
                 'sensor_count': len(tofs),
@@ -424,39 +482,99 @@ async def main():
     print("🤖 Robot Localization System - Single File Edition")
     print("=" * 50)
     
-    # Initialize hardware
-    if not await localization_system.initialize_hardware():
-        print("❌ Cannot continue without hardware")
-        return
+    # Find available port
+    import socket
+    def find_free_port(start_port=8000):
+        for port in range(start_port, start_port + 10):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('', port))
+                    return port
+            except OSError:
+                continue
+        return 8000  # fallback
     
-    # Start localization in background
-    localization_task = asyncio.create_task(localization_system.localization_loop())
+    port = find_free_port()
+    
+    # Initialize hardware
+    hardware_ok = await localization_system.initialize_hardware()
+    if not hardware_ok:
+        print("⚠️  Hardware initialization failed, running in demo mode")
+        latest_data.update({
+            'status': 'demo_mode',
+            'position': [0.0, 0.0],
+            'angle': 0.0,
+            'error': 0.0,
+            'sensor_count': 0,
+            'localization_time_ms': 0
+        })
+    
+    # Start localization in background (only if hardware is OK)
+    localization_task = None
+    if hardware_ok:
+        localization_task = asyncio.create_task(localization_system.localization_loop())
+    else:
+        # Start demo mode
+        localization_task = asyncio.create_task(demo_mode())
     
     # Start web server
     config_server = uvicorn.Config(
         app=app,
         host="0.0.0.0", 
-        port=8000,
-        log_level="info"
+        port=port,
+        log_level="warning"  # Reduce log noise
     )
     server = uvicorn.Server(config_server)
     
-    print("🌐 Web server starting on http://localhost:8000")
-    print("📱 Open your browser to see the robot moving!")
+    print(f"🌐 Web server starting on http://localhost:{port}")
+    if not hardware_ok:
+        print("🎮 Running in DEMO MODE (no hardware detected)")
+    print("📱 Open your browser to see the visualization!")
     print("🛑 Press Ctrl+C to stop everything")
+    print()
     
     try:
         # Run server (this blocks)
         await server.serve()
     except KeyboardInterrupt:
         print("\n🛑 Stopping system...")
+    except Exception as e:
+        print(f"❌ Server error: {e}")
     finally:
         localization_system.stop()
-        localization_task.cancel()
-        try:
-            await localization_task
-        except asyncio.CancelledError:
-            pass
+        if localization_task:
+            localization_task.cancel()
+            try:
+                await localization_task
+            except asyncio.CancelledError:
+                pass
+
+async def demo_mode():
+    """Demo mode that simulates robot movement when no hardware is available"""
+    print("🎮 Starting demo mode - simulated robot movement")
+    
+    t = 0
+    while True:
+        # Simulate robot moving in a circle
+        x = 400 * math.cos(t * 0.1)
+        y = 300 * math.sin(t * 0.1)
+        angle = t * 0.1 + math.pi/2
+        
+        latest_data.update({
+            'position': [x, y],
+            'angle': angle,
+            'error': 5.0 + 2.0 * math.sin(t * 0.05),
+            'timestamp': time.time(),
+            'localization_time_ms': 15.0 + 5.0 * math.sin(t * 0.1),
+            'sensor_count': 4,
+            'status': 'demo_mode'
+        })
+        
+        # Broadcast to connected clients
+        await localization_system.broadcast_data()
+        
+        t += 1
+        await asyncio.sleep(0.1)  # 10 Hz
 
 if __name__ == "__main__":
     try:

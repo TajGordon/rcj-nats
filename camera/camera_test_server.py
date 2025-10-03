@@ -3,6 +3,7 @@ from picamera2 import Picamera2
 import cv2
 import asyncio
 from fastapi import FastAPI, WebSocket
+import uvicorn
 
 class Camera:
     def __init__(self):
@@ -23,7 +24,6 @@ class Camera:
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
             await asyncio.sleep(0.05) # set the fps
-
 
 
 app = FastAPI()

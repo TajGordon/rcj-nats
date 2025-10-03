@@ -4,17 +4,24 @@ import cv2
 import asyncio
 from fastapi import FastAPI, WebSocket
 import uvicorn
+import time
 
 class Camera:
     def __init__(self):
-        self.picam = Picamera2()
-        self.picam.configure(self.picam.create_video_configuration(
+        self.picamera = Picamera2()
+        self.picamera.configure(self.picamera.create_video_configuration(
             main={"format": "RGB888"}
         ))
-        self.picam.start()
+        self._focus_camera()
+        self.picamera.start()
     
+    def _focus_camera(self):
+        self.picamera.set_controls({'AfMode': 1})
+        self.picamera.set_controls({'AfTrigger': 0})
+        time.sleep(2)
+
     def get_frame(self):
-        frame = self.picam.capture_array()
+        frame = self.picamera.capture_array()
         ret, jpg = cv2.imencode('.jpg', frame)
         return jpg.tobytes()
     

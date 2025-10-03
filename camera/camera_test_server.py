@@ -5,6 +5,7 @@ import asyncio
 from fastapi import FastAPI, WebSocket
 import uvicorn
 import time
+from libcamera import controls
 
 class Camera:
     def __init__(self):
@@ -16,8 +17,7 @@ class Camera:
         self.picamera.start()
     
     def _focus_camera(self):
-        self.picamera.set_controls({'AfMode': 1})
-        self.picamera.set_controls({'AfTrigger': 0})
+        self.picamera.set_controls({'AfMode': controls.AfModeEnum.Manual, 'LensPosition': 20.0})
         time.sleep(2)
 
     def get_frame(self):

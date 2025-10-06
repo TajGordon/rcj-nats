@@ -12,6 +12,7 @@ import time
 import threading
 from typing import Dict, Any, List
 import logging
+import config
 
 # FastAPI and web server imports
 from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect  
@@ -316,13 +317,32 @@ class LocalizationSystem:
             
             if config and hasattr(config, 'tof_addrs') and config.tof_addrs:
                 # Use config if available
-                for addr in config.tof_addrs:
+                for i, addr in enumerate(config.tof_addrs):
                     try:
-                        offset = config.tof_offsets.get(addr, (0, 0))
-                        angle = math.radians(config.tof_angles.get(addr, 0))
-                        tof = ToF(addr=addr, offset=offset, angle=angle, i2c=i2c)
+                        # Handle both list and dict formats for offsets and angles
+                        if hasattr(config, 'tof_offsets'):
+                            if isinstance(config.tof_offsets, list) and i < len(config.tof_offsets):
+                                offset = config.tof_offsets[i]
+                            elif isinstance(config.tof_offsets, dict):
+                                offset = config.tof_offsets.get(addr, 0)
+                            else:
+                                offset = 0
+                        else:
+                            offset = 0
+                            
+                        if hasattr(config, 'tof_angles'):
+                            if isinstance(config.tof_angles, list) and i < len(config.tof_angles):
+                                angle = math.radians(config.tof_angles[i])
+                            elif isinstance(config.tof_angles, dict):
+                                angle = math.radians(config.tof_angles.get(addr, 0))
+                            else:
+                                angle = 0
+                        else:
+                            angle = 0
+                            
+                        tof = ToF(addr, offset, angle, i2c)
                         tofs.append(tof)
-                        print(f"  ✅ ToF sensor at 0x{addr:02x}")
+                        print(f"  ✅ ToF sensor at 0x{addr:02x} (offset: {offset}mm, angle: {math.degrees(angle):.1f}°)")
                     except Exception as e:
                         print(f"  ❌ Failed ToF at 0x{addr:02x}: {e}")
             else:
@@ -332,7 +352,7 @@ class LocalizationSystem:
                 
                 for addr, angle_deg in default_sensors:
                     try:
-                        tof = ToF(addr=addr, offset=(0, 0), angle=math.radians(angle_deg), i2c=i2c)
+                        tof = ToF(addr, 0, math.radians(angle_deg), i2c)
                         tofs.append(tof)
                         print(f"  ✅ ToF sensor at 0x{addr:02x}, {angle_deg}°")
                     except Exception as e:
@@ -344,7 +364,7 @@ class LocalizationSystem:
                 else:
                     # Create mock sensors for testing
                     for addr, angle_deg in [(0x29, 0), (0x2A, 90)]:
-                        tof = ToF(addr=addr, offset=(0, 0), angle=math.radians(angle_deg))
+                        tof = ToF(addr, 0, math.radians(angle_deg))
                         tofs.append(tof)
                     print("  🔧 Using mock sensors for testing")
             

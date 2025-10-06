@@ -23,14 +23,16 @@ class IMU:
         time.sleep(0.04) # delay to make sure the IMU is initialized
         i, j, k, w = self.bno.quaternion  # type: ignore[reportAttributeAccessIssue]
         self.angle_offset = -(math.atan2(2*(w*k + i*j), 1 - 2 * (j*j + k*k)))
-        # self.angle_offset = -self._get_angle()
+        self.raw_angle = 0
 
+    def reset_heading(self):
+        self.angle_offset = -self._get_angle()
 
     def _get_angle(self):
         # formula courtesy of chatgpt - i'll derive myself later, but it feels like solving using full matrix expansion would be tedious
         i, j, k, w = self._read_quat()
-        yaw = math.atan2(2*(w*k + i*j), 1 - 2 * (j*j + k*k))
-        return yaw
+        self.raw_angle = math.atan2(2*(w*k + i*j), 1 - 2 * (j*j + k*k))
+        return self.raw_angle
 
     def _read_quat(self):
         i, j, k, w = self.bno.quaternion # type: ignore[reportAttributeAccessIssue]

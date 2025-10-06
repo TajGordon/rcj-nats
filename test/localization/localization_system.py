@@ -70,6 +70,7 @@ latest_data: Dict[str, Any] = {
     'timestamp': 0,
     'localization_time_ms': 0,
     'sensor_count': 0,
+    'tof_readings': [],  # List of {addr, distance, angle, offset}
     'status': 'initializing'
 }
 
@@ -118,6 +119,21 @@ HTML_TEMPLATE = """
         .connected { background: rgba(76, 175, 80, 0.8); }
         .disconnected { background: rgba(244, 67, 54, 0.8); }
         .footer { text-align: center; margin-top: 30px; opacity: 0.7; }
+        .tof-sensors { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+            gap: 10px; margin-top: 15px; 
+        }
+        .tof-sensor { 
+            background: rgba(255,255,255,0.15); padding: 10px; border-radius: 8px; 
+            text-align: center; border: 1px solid rgba(255,255,255,0.2);
+        }
+        .tof-addr { font-size: 12px; opacity: 0.8; margin-bottom: 3px; }
+        .tof-distance { font-size: 16px; font-weight: bold; margin-bottom: 3px; }
+        .tof-angle { font-size: 11px; opacity: 0.7; }
+        .tof-error { color: #ff6b6b; }
+        .tof-normal { color: #51cf66; }
+        .tof-far { color: #ffd43b; }
+        .tof-placeholder { text-align: center; opacity: 0.6; padding: 20px; }
     </style>
 </head>
 <body>
@@ -151,6 +167,13 @@ HTML_TEMPLATE = """
                     <div class="metric-label">Update Time</div>
                     <div class="metric-value" id="updateTime">-- ms</div>
                 </div>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h3 style="margin-top: 0; text-align: center;">📡 ToF Sensors</h3>
+            <div id="tofSensors" class="tof-sensors">
+                <div class="tof-placeholder">No sensor data available</div>
             </div>
         </div>
         
@@ -228,8 +251,39 @@ HTML_TEMPLATE = """
             });
         }
         
-        function drawRobot(pos, angle) {
+        function drawRobot(pos, angle, tofReadings) {
             const [canvasX, canvasY] = fieldToCanvas(pos[0], pos[1]);
+            
+            // Draw ToF sensor beams first (so they appear behind robot)
+            if (tofReadings && tofReadings.length > 0) {
+                tofReadings.forEach(tof => {
+                    if (tof.distance > 0) {
+                        const sensorAngle = angle + (tof.angle * Math.PI / 180);
+                        const distance = Math.min(tof.distance, 1000) * SCALE; // Cap at 1m for display
+                        
+                        // Sensor beam
+                        ctx.strokeStyle = tof.distance < 200 ? "#ff6b6b" : tof.distance < 500 ? "#ffd43b" : "#51cf66";
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(canvasX, canvasY);
+                        const beamX = canvasX + Math.cos(sensorAngle) * distance;
+                        const beamY = canvasY - Math.sin(sensorAngle) * distance;
+                        ctx.lineTo(beamX, beamY);
+                        ctx.stroke();
+                        
+                        // Sensor detection point
+                        ctx.fillStyle = ctx.strokeStyle;
+                        ctx.beginPath();
+                        ctx.arc(beamX, beamY, 3, 0, 2 * Math.PI);
+                        ctx.fill();
+                        
+                        // Sensor label
+                        ctx.fillStyle = "#000";
+                        ctx.font = "10px Arial";
+                        ctx.fillText(`0x${tof.addr.toString(16).toUpperCase()}`, beamX + 5, beamY - 5);
+                    }
+                });
+            }
             
             // Robot body
             ctx.fillStyle = "#333333";
@@ -253,6 +307,30 @@ HTML_TEMPLATE = """
             ctx.beginPath();
             ctx.arc(canvasX, canvasY, 40 * SCALE, 0, 2 * Math.PI);
             ctx.stroke();
+        }
+        
+        function updateTofSensors(tofReadings) {
+            const container = document.getElementById('tofSensors');
+            
+            if (!tofReadings || tofReadings.length === 0) {
+                container.innerHTML = '<div class="tof-placeholder">No sensor data available</div>';
+                return;
+            }
+            
+            container.innerHTML = tofReadings.map(tof => {
+                const distanceClass = tof.distance < 0 ? 'tof-error' : 
+                                    tof.distance < 200 ? 'tof-normal' : 
+                                    tof.distance < 500 ? 'tof-far' : 'tof-normal';
+                const distanceText = tof.distance < 0 ? 'ERROR' : `${tof.distance.toFixed(0)} mm`;
+                
+                return `
+                    <div class="tof-sensor">
+                        <div class="tof-addr">0x${tof.addr.toString(16).toUpperCase().padStart(2, '0')}</div>
+                        <div class="tof-distance ${distanceClass}">${distanceText}</div>
+                        <div class="tof-angle">${tof.angle.toFixed(0)}°</div>
+                    </div>
+                `;
+            }).join('');
         }
         
         // WebSocket connection
@@ -280,9 +358,12 @@ HTML_TEMPLATE = """
             document.getElementById('sensors').textContent = data.sensor_count;
             document.getElementById('updateTime').textContent = `${data.localization_time_ms.toFixed(1)} ms`;
             
-            // Draw field with robot
+            // Update ToF sensors display
+            updateTofSensors(data.tof_readings);
+            
+            // Draw field with robot and ToF data
             drawField();
-            drawRobot(data.position, data.angle);
+            drawRobot(data.position, data.angle, data.tof_readings);
         };
         
         // Initial draw
@@ -418,6 +499,26 @@ class LocalizationSystem:
             try:
                 start_time = time.time()
                 
+                # Collect ToF sensor readings
+                tof_readings = []
+                for tof in self.localizer.tofs:
+                    try:
+                        distance = tof.next_dist()
+                        tof_readings.append({
+                            'addr': tof.addr,
+                            'distance': distance,
+                            'angle': math.degrees(tof.angle),
+                            'offset': tof.offset
+                        })
+                    except Exception as e:
+                        # Handle sensor read errors gracefully
+                        tof_readings.append({
+                            'addr': tof.addr,
+                            'distance': -1,  # Error indicator
+                            'angle': math.degrees(tof.angle),
+                            'offset': tof.offset
+                        })
+                
                 # Perform localization
                 position, error = self.localizer.localize()
                 angle = self.localizer.imu.cur_angle()
@@ -430,6 +531,7 @@ class LocalizationSystem:
                     'error': error,
                     'timestamp': time.time(),
                     'localization_time_ms': localization_time,
+                    'tof_readings': tof_readings,
                     'status': 'running'
                 })
                 
@@ -574,6 +676,10 @@ async def demo_mode():
     """Demo mode that simulates robot movement when no hardware is available"""
     print("🎮 Starting demo mode - simulated robot movement")
     
+    # Mock ToF sensor configuration matching your config
+    mock_tof_addrs = [0x52, 0x5E, 0x5C, 0x5F, 0x5D, 0x50, 0x5A, 0x58]
+    mock_tof_angles = [0, 60, 90, 135, 180, -135, -90, -60]
+    
     t = 0
     while True:
         # Simulate robot moving in a circle
@@ -581,13 +687,36 @@ async def demo_mode():
         y = 300 * math.sin(t * 0.1)
         angle = t * 0.1 + math.pi/2
         
+        # Generate mock ToF readings
+        tof_readings = []
+        for i, (addr, sensor_angle) in enumerate(zip(mock_tof_addrs, mock_tof_angles)):
+            # Simulate realistic distance readings based on robot position and field boundaries
+            sensor_world_angle = angle + math.radians(sensor_angle)
+            
+            # Simple simulation - distance varies based on sensor direction and time
+            base_distance = 300 + 200 * math.sin(t * 0.05 + i * 0.5)
+            noise = 20 * math.sin(t * 0.2 + i * 1.3)  # Add some noise
+            distance = max(50, base_distance + noise)  # Minimum 50mm
+            
+            # Occasionally simulate sensor errors
+            if (t + i * 3) % 50 < 2:  # 4% error rate per sensor
+                distance = -1  # Error
+            
+            tof_readings.append({
+                'addr': addr,
+                'distance': distance,
+                'angle': sensor_angle,
+                'offset': 8.5 if i == 0 else 80  # Match your config
+            })
+        
         latest_data.update({
             'position': [x, y],
             'angle': angle,
             'error': 5.0 + 2.0 * math.sin(t * 0.05),
             'timestamp': time.time(),
             'localization_time_ms': 15.0 + 5.0 * math.sin(t * 0.1),
-            'sensor_count': 4,
+            'sensor_count': len(mock_tof_addrs),
+            'tof_readings': tof_readings,
             'status': 'demo_mode'
         })
         

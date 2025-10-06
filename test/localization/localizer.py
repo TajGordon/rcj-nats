@@ -132,7 +132,7 @@ if __name__ == "__main__":
     # Initialize real hardware components
     try:
         print("🔧 Initializing I2C bus...")
-        i2c = board.I2C(board.SCL, board.SDA)
+        i2c = busio.I2C(board.SCL, board.SDA)
         
         print("🧭 Initializing IMU...")
         imu = IMU(i2c=i2c)

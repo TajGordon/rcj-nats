@@ -35,6 +35,7 @@ class Localizer:
         for tof in self.tofs:
             dist = tof.next_dist()
             self.tof_distances[tof.angle] = dist
+            print(f"dist: {dist}")
     
     def _cast_ray(self, position, angle):
         # just stores the distance of the closest one 

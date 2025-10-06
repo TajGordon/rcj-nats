@@ -45,7 +45,7 @@ class MockLocalizer:
         self.best_error = float('inf')
         
         # Initialize ToF sensors from config or use defaults
-        if hasattr(config, 'tof_addrs') and config.tof_addrs:
+        if hasattr(config, 'tof_addrs') and config.tof_addrs and False:
             # Use config if available
             for addr in config.tof_addrs:
                 mock_tof = MockToF(addr=addr, offset=config.tof_offsets[addr], 

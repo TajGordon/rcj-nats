@@ -499,29 +499,22 @@ class LocalizationSystem:
             try:
                 start_time = time.time()
                 
-                # Collect ToF sensor readings
-                tof_readings = []
-                for tof in self.localizer.tofs:
-                    try:
-                        distance = tof.next_dist()
-                        tof_readings.append({
-                            'addr': tof.addr,
-                            'distance': distance,
-                            'angle': math.degrees(tof.angle),
-                            'offset': tof.offset
-                        })
-                    except Exception as e:
-                        # Handle sensor read errors gracefully
-                        tof_readings.append({
-                            'addr': tof.addr,
-                            'distance': -1,  # Error indicator
-                            'angle': math.degrees(tof.angle),
-                            'offset': tof.offset
-                        })
-                
-                # Perform localization
+                # Perform localization (this updates the ToF distances internally)
                 position, error = self.localizer.localize()
                 angle = self.localizer.imu.cur_angle()
+                
+                # Get ToF readings from localizer's updated data
+                tof_readings = []
+                for tof in self.localizer.tofs:
+                    # Get distance from localizer's tof_distances dict using the sensor's angle
+                    distance = self.localizer.tof_distances.get(tof.angle, -1)
+                    tof_readings.append({
+                        'addr': tof.addr,
+                        'distance': distance,
+                        'angle': math.degrees(tof.angle),
+                        'offset': tof.offset
+                    })
+                
                 localization_time = (time.time() - start_time) * 1000
                 
                 # Update global data

@@ -19,10 +19,21 @@ walls = [
 ]
 
 # bot-specific config
-if host == 'storm':
-    tof_addrs = []
-    tof_offsets = {}
-    tof_angles = {}
+if host == 'storm' or True:
+    imu_addr = 0x4a
+    tof_addrs = [
+        0x50 + 2, 
+        0x50 + 2 + 4 + 8,
+        0x50 + 4 + 8,
+        0x50 + 1 + 2 + 4 + 8,
+        0x50 + 1 + 4 + 8,
+        0x50,
+        0x50 + 2 + 8,
+        0x50 + 8,
+        ]
+    tof_offsets = [8.5, 80, 80, 80, 80, 80, 80, 80] # mm
+    tof_angles = [0, 60, 90, 135, 180, -135, -90, -60]
+
     
 else:
     print("no config made for you :(")

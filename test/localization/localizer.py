@@ -1,12 +1,13 @@
 import config
 import board
+import busio
 from tof import ToF
 from imu import IMU
 
 import math
 
 class Localizer:
-    def __init__(self, i2c = board.I2C(board.SCL, board.SDA), tofs=None, imu=IMU(i2c=board.I2C(board.SCL, board.SDA))):
+    def __init__(self, i2c = busio.I2C(board.SCL, board.SDA), tofs=None, imu=IMU(i2c=board.I2C(board.SCL, board.SDA))):
         self.tofs = tofs if tofs is not None else []
         self.tof_angles = [] # used to key for distances
         self.tof_distances = {} # angle -> distance

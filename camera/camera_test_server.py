@@ -4,17 +4,24 @@ import cv2
 import asyncio
 from fastapi import FastAPI, WebSocket
 import uvicorn
+import time
+from libcamera import controls
 
 class Camera:
     def __init__(self):
-        self.picam = Picamera2()
-        self.picam.configure(self.picam.create_video_configuration(
+        self.picamera = Picamera2()
+        self.picamera.configure(self.picamera.create_video_configuration(
             main={"format": "RGB888"}
         ))
-        self.picam.start()
+        self._focus_camera()
+        self.picamera.start()
     
+    def _focus_camera(self):
+        self.picamera.set_controls({'AfMode': controls.AfModeEnum.Manual, 'LensPosition': 20.0})
+        time.sleep(2)
+
     def get_frame(self):
-        frame = self.picam.capture_array()
+        frame = self.picamera.capture_array()
         ret, jpg = cv2.imencode('.jpg', frame)
         return jpg.tobytes()
     
@@ -24,7 +31,6 @@ class Camera:
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
             await asyncio.sleep(0.05) # set the fps
-
 
 
 app = FastAPI()

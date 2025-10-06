@@ -94,6 +94,7 @@ class Localizer:
         self._update_distances() # update to start the localization with accurate distances
         
         angle = self.imu.cur_angle() # to not recall a bunch of times
+        self.best_error = self._compute_error(self.best_guess, angle)
         
         # in mm
         move_amount = 32 # power of two cuz why not

@@ -437,10 +437,10 @@ class LocalizationSystem:
                 await self.broadcast_data()
                 
                 # Print status
-                print(f"📍 Pos: ({position[0]:.1f}, {position[1]:.1f}), "
-                      f"Angle: {math.degrees(angle):.1f}°, "
-                      f"Error: {error:.2f}, "
-                      f"Time: {localization_time:.1f}ms")
+                # print(f"📍 Pos: ({position[0]:.1f}, {position[1]:.1f}), "
+                #       f"Angle: {math.degrees(angle):.1f}°, "
+                #       f"Error: {error:.2f}, "
+                #       f"Time: {localization_time:.1f}ms")
                 
                 # Wait for next update (10 Hz)
                 await asyncio.sleep(0.1)

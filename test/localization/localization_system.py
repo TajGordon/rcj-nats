@@ -37,6 +37,7 @@ except ImportError:
 
 try:
     import board
+    import busio
     from tof import ToF
     from imu import IMU
     HARDWARE_AVAILABLE = True
@@ -305,7 +306,7 @@ class LocalizationSystem:
             latest_data['status'] = 'initializing_hardware'
             
             # Initialize I2C
-            i2c = board.I2C(board.SCL, board.SDA)
+            i2c = busio.I2C(board.SCL, board.SDA)
             
             # Initialize IMU
             print("🧭 Initializing IMU...")

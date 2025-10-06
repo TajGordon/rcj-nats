@@ -19,7 +19,7 @@ walls = [
 ]
 
 # bot-specific config
-if host == 'storm' or True:
+if True:
     imu_addr = 0x4a
     tof_addrs = [
         0x50 + 2, 

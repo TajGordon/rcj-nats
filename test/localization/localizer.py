@@ -45,6 +45,7 @@ class Localizer:
         minimum_distance = float('inf') # stores distance squared
         dx = math.cos(angle)
         dy = math.sin(angle)
+        print(f"casting ray from {position} at angle {math.degrees(angle)}° (dx: {dx}, dy: {dy})")
         for wall in tconf.walls: # should be 10 walls
             # TODO! write the code
             if wall['type'] == 'horizontal':

@@ -45,7 +45,7 @@ class Localizer:
         minimum_distance = float('inf') # stores distance squared
         dx = math.cos(angle)
         dy = math.sin(angle)
-        print(f"casting ray from {position} at angle {math.degrees(angle)}° (dx: {dx}, dy: {dy})")
+        # print(f"casting ray from {position} at angle {math.degrees(angle)}° (dx: {dx}, dy: {dy})")
         for wall in tconf.walls: # should be 10 walls
             # TODO! write the code
             if wall['type'] == 'vertical':
@@ -77,9 +77,9 @@ class Localizer:
     def _cast_rays(self, position, bot_angle):
         # goes through each angle and computes the raycast
         distances = {}
-        print(f"self.tof_angles: {self.tof_angles}")
+        # print(f"self.tof_angles: {self.tof_angles}")
         for angle in self.tof_angles:
-            print(f"bot angle: {bot_angle} tof_angle: {angle}")
+            # print(f"bot angle: {bot_angle} tof_angle: {angle}")
             dist = self._cast_ray(position, bot_angle + angle)
             distances[angle] = dist
         return distances

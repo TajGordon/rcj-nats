@@ -35,7 +35,7 @@ class Localizer:
         for tof in self.tofs:
             dist = tof.next_dist()
             self.tof_distances[tof.angle] = dist
-            print(f"dist: {dist}")
+            # print(f"dist: {dist}")
     
     def _cast_ray(self, position, angle):
         # just stores the distance of the closest one 
@@ -94,7 +94,8 @@ class Localizer:
         self._update_distances() # update to start the localization with accurate distances
         
         angle = self.imu.cur_angle() # to not recall a bunch of times
-        self.best_error = self._compute_error(self.best_guess, angle)
+        # self.best_error = self._compute_error(self.best_guess, angle)
+        self.best_error = float('inf')
         
         # in mm
         move_amount = 32 # power of two cuz why not
@@ -110,6 +111,7 @@ class Localizer:
                         guess_pos = [self.best_guess[0] + move_amount * dx, self.best_guess[1] + move_amount * dy]
                         error = self._compute_error(guess_pos, angle)
                         if error < self.best_error:
+                            print(f"fbest error: {error}")
                             converged = False
                             self.best_error = error
                             self.best_guess = guess_pos

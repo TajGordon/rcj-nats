@@ -10,7 +10,7 @@ class Localizer:
     def __init__(self, i2c = busio.I2C(board.SCL, board.SDA), tofs=None, imu=IMU(i2c=busio.I2C(board.SCL, board.SDA))):
         self.tofs = tofs if tofs is not None else []
         # self.tof_angles = [] # used to key for distances
-        self.tof_angles = list(map(math.radians, tconf.tof_angles.values()))
+        self.tof_angles = list(map(math.radians, list(tconf.tof_angles.values())))
         self.tof_distances = {} # angle -> distance
         # initialize tofs if not provided, this lets us fake the tofs
         if tofs is None:
@@ -76,7 +76,7 @@ class Localizer:
         distances = {}
         print(f"self.tof_angles: {self.tof_angles}")
         for angle in self.tof_angles:
-            print(f"casting ray at angle {math.degrees(bot_angle + angle)}")
+            print(f"casting ray at angle {(bot_angle + angle)}")
             dist = self._cast_ray(position, bot_angle + angle)
             distances[angle] = dist
         return distances

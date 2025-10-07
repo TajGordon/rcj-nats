@@ -48,7 +48,7 @@ class Localizer:
         print(f"casting ray from {position} at angle {math.degrees(angle)}° (dx: {dx}, dy: {dy})")
         for wall in tconf.walls: # should be 10 walls
             # TODO! write the code
-            if wall['type'] == 'horizontal':
+            if wall['type'] == 'vertical':
                 if dx == 0: continue
                 t = (wall['x'] - position[0])/dx
                 if t <= 0:

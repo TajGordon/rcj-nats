@@ -116,6 +116,9 @@ class Localizer:
                 for dx in range(-1, 2):
                     for dy in range(-1, 2):
                         guess_pos = [self.best_guess[0] + move_amount * dx, self.best_guess[1] + move_amount * dy]
+                        if guess_pos[0] > 2430/2 or guess_pos[0] < -2430 or 
+                            guess_pos[1] > 1820/2 or guess_pos[1] < -1820/2:
+                            continue
                         error = self._compute_error(guess_pos, angle)
                         if error < self.best_error:
                             print(f"fbest error: {error}")

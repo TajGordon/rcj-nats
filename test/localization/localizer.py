@@ -48,6 +48,7 @@ class Localizer:
         for wall in tconf.walls: # should be 10 walls
             # TODO! write the code
             if wall['type'] == 'horizontal':
+                if dx == 0: continue
                 t = (wall['x'] - position[0])/dx
                 if t <= 0:
                     continue
@@ -59,6 +60,7 @@ class Localizer:
                 if dist < minimum_distance:
                     minimum_distance = dist
             else:
+                if dy == 0: continue
                 t = (wall['y'] - position[0])/dy
                 if t <= 0:
                     continue

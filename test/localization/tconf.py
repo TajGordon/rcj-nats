@@ -1,5 +1,5 @@
 import socket
-
+import math
 host = socket.gethostname()
 
 # global ones - not bot specific
@@ -33,7 +33,7 @@ if True:
         ]
     tof_offsets = [8.5, 80, 80, 80, 80, 80, 80, 80] # mm
     tof_offsets = {0x50+2: 8.5, 0x50+2+4+8: 80, 0x50+4+8: 80, 0x50+1+2+4+8: 80, 0x50+1+4+8: 80, 0x50: 80, 0x50+2+8: 80, 0x50+8: 80}
-    tof_angles = [0, 60, 90, 135, 180, -135, -90, -60]
+    tof_angles = list(map(math.radians, [0, 60, 90, 135, 180, -135, -90, -60]))
     tof_angles = {0x50+2: 0, 0x50+2+4+8: 60, 0x50+4+8: 90, 0x50+1+2+4+8: 135, 0x50+1+4+8: 180, 0x50: -135, 0x50+2+8: -90, 0x50+8: -60}
 
     

@@ -1,4 +1,4 @@
-import config
+import tconf
 import board
 import busio
 from tof import ToF
@@ -13,8 +13,8 @@ class Localizer:
         self.tof_distances = {} # angle -> distance
         # initialize tofs if not provided, this lets us fake the tofs
         if tofs is None:
-            for addr in config.tof_addrs:
-                self.tofs.append(ToF(addr=addr, offset=config.tof_offsets[addr], angle=config.tof_angles[addr], i2c=i2c))
+            for addr in tconf.tof_addrs:
+                self.tofs.append(ToF(addr=addr, offset=tconf.tof_offsets[addr], angle=tconf.tof_angles[addr], i2c=i2c))
                 self.tof_angles.append(self.tofs[-1].angle)
                 self.tof_distances[self.tof_angles[-1]] = 0 # default value
         
@@ -44,7 +44,7 @@ class Localizer:
         minimum_distance = float('inf') # stores distance squared
         dx = math.cos(angle)
         dy = math.sin(angle)
-        for wall in config.walls: # should be 10 walls
+        for wall in tconf.walls: # should be 10 walls
             # TODO! write the code
             if wall['type'] == 'horizontal':
                 t = (wall['x'] - position[0])/dx
@@ -145,10 +145,10 @@ if __name__ == "__main__":
         print("📡 Initializing ToF sensors...")
         # Create ToF sensors based on config
         tofs = []
-        if config.tof_addrs:  # Use config if available
-            for addr in config.tof_addrs:
-                offset = config.tof_offsets.get(addr, (0, 0))
-                angle = config.tof_angles.get(addr, 0)
+        if tconf.tof_addrs:  # Use config if available
+            for addr in tconf.tof_addrs:
+                offset = tconf.tof_offsets.get(addr, (0, 0))
+                angle = tconf.tof_angles.get(addr, 0)
                 tof = ToF(addr=addr, offset=offset, angle=math.radians(angle), i2c=i2c)
                 tofs.append(tof)
                 print(f"  ✅ ToF sensor at 0x{addr:02x}, angle {angle}°")

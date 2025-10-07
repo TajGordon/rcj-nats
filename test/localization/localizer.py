@@ -90,7 +90,7 @@ class Localizer:
         # for example, you could take into account whether the tof had a huge difference to its last variation - perhaps a bot is blocking / unblocking it
         error = 0
         raycast_distances = self._cast_rays(position, bot_angle)
-        print(f"raycast distances: {raycast_distances}")
+        # print(f"raycast distances: {raycast_distances}")
         for angle in self.tof_angles:
             diff = abs(raycast_distances[angle] - (self.tof_distances[angle] ** 2)) # square the tof distance to match the squared distance from the raycasting
             error += diff

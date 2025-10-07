@@ -6,7 +6,7 @@ Simulates robot position, raycasts ToF sensors with ±2% error, and displays loc
 import pygame as pg
 import math
 import random
-import config
+import test.localization.tconf as tconf
 
 # Mock classes to avoid importing hardware-specific libraries
 class MockToF:
@@ -45,11 +45,11 @@ class MockLocalizer:
         self.best_error = float('inf')
         
         # Initialize ToF sensors from config or use defaults
-        if hasattr(config, 'tof_addrs') and config.tof_addrs and False:
+        if hasattr(tconf, 'tof_addrs') and tconf.tof_addrs and False:
             # Use config if available
-            for addr in config.tof_addrs:
-                mock_tof = MockToF(addr=addr, offset=config.tof_offsets[addr], 
-                                 angle=config.tof_angles[addr], i2c=i2c)
+            for addr in tconf.tof_addrs:
+                mock_tof = MockToF(addr=addr, offset=tconf.tof_offsets[addr], 
+                                 angle=tconf.tof_angles[addr], i2c=i2c)
                 self.tofs.append(mock_tof)
                 self.tof_angles.append(mock_tof.angle)
                 self.tof_distances[mock_tof.angle] = 0
@@ -82,7 +82,7 @@ class MockLocalizer:
         minimum_distance = float('inf')
         dx = math.cos(angle)
         dy = math.sin(angle)
-        for wall in config.walls:
+        for wall in tconf.walls:
             if wall['type'] == 'horizontal': 
                 t = (wall['y'] - position[1]) / dy  if dy != 0 else float('inf') # Fixed: should be position[1] for y
                 if t <= 0:

@@ -1,4 +1,4 @@
-import config
+import tconf
 import board
 import busio
 from tof import ToF
@@ -9,13 +9,14 @@ import math
 class Localizer:
     def __init__(self, i2c = busio.I2C(board.SCL, board.SDA), tofs=None, imu=IMU(i2c=busio.I2C(board.SCL, board.SDA))):
         self.tofs = tofs if tofs is not None else []
-        self.tof_angles = [] # used to key for distances
+        # self.tof_angles = [] # used to key for distances
+        self.tof_angles = list(map(math.radians, list(tconf.tof_angles.values())))
         self.tof_distances = {} # angle -> distance
         # initialize tofs if not provided, this lets us fake the tofs
         if tofs is None:
-            for addr in config.tof_addrs:
-                self.tofs.append(ToF(addr=addr, offset=config.tof_offsets[addr], angle=config.tof_angles[addr], i2c=i2c))
-                self.tof_angles.append(self.tofs[-1].angle)
+            for addr in tconf.tof_addrs:
+                self.tofs.append(ToF(addr=addr, offset=tconf.tof_offsets[addr], angle=tconf.tof_angles[addr], i2c=i2c))
+                # self.tof_angles.append(self.tofs[-1].angle)
                 self.tof_distances[self.tof_angles[-1]] = 0 # default value
         
         # get angle from the imu, just call 'cur_angle()'
@@ -35,7 +36,7 @@ class Localizer:
         for tof in self.tofs:
             dist = tof.next_dist()
             self.tof_distances[tof.angle] = dist
-            print(f"dist: {dist}")
+            # print(f"dist: {dist}")
     
     def _cast_ray(self, position, angle):
         # just stores the distance of the closest one 
@@ -44,9 +45,11 @@ class Localizer:
         minimum_distance = float('inf') # stores distance squared
         dx = math.cos(angle)
         dy = math.sin(angle)
-        for wall in config.walls: # should be 10 walls
+        # print(f"casting ray from {position} at angle {math.degrees(angle)}° (dx: {dx}, dy: {dy})")
+        for wall in tconf.walls: # should be 10 walls
             # TODO! write the code
-            if wall['type'] == 'horizontal':
+            if wall['type'] == 'vertical':
+                if dx == 0: continue
                 t = (wall['x'] - position[0])/dx
                 if t <= 0:
                     continue
@@ -58,6 +61,7 @@ class Localizer:
                 if dist < minimum_distance:
                     minimum_distance = dist
             else:
+                if dy == 0: continue
                 t = (wall['y'] - position[0])/dy
                 if t <= 0:
                     continue
@@ -73,7 +77,9 @@ class Localizer:
     def _cast_rays(self, position, bot_angle):
         # goes through each angle and computes the raycast
         distances = {}
+        # print(f"self.tof_angles: {self.tof_angles}")
         for angle in self.tof_angles:
+            # print(f"bot angle: {bot_angle} tof_angle: {angle}")
             dist = self._cast_ray(position, bot_angle + angle)
             distances[angle] = dist
         return distances
@@ -84,6 +90,7 @@ class Localizer:
         # for example, you could take into account whether the tof had a huge difference to its last variation - perhaps a bot is blocking / unblocking it
         error = 0
         raycast_distances = self._cast_rays(position, bot_angle)
+        # print(f"raycast distances: {raycast_distances}")
         for angle in self.tof_angles:
             diff = abs(raycast_distances[angle] - (self.tof_distances[angle] ** 2)) # square the tof distance to match the squared distance from the raycasting
             error += diff
@@ -94,7 +101,8 @@ class Localizer:
         self._update_distances() # update to start the localization with accurate distances
         
         angle = self.imu.cur_angle() # to not recall a bunch of times
-        self.best_error = self._compute_error(self.best_guess, angle)
+        # self.best_error = self._compute_error(self.best_guess, angle)
+        self.best_error = float('inf')
         
         # in mm
         move_amount = 32 # power of two cuz why not
@@ -108,8 +116,12 @@ class Localizer:
                 for dx in range(-1, 2):
                     for dy in range(-1, 2):
                         guess_pos = [self.best_guess[0] + move_amount * dx, self.best_guess[1] + move_amount * dy]
+                        if guess_pos[0] > 2430/2 or guess_pos[0] < -2430 or 
+                            guess_pos[1] > 1820/2 or guess_pos[1] < -1820/2:
+                            continue
                         error = self._compute_error(guess_pos, angle)
                         if error < self.best_error:
+                            print(f"fbest error: {error}")
                             converged = False
                             self.best_error = error
                             self.best_guess = guess_pos
@@ -140,10 +152,10 @@ if __name__ == "__main__":
         print("📡 Initializing ToF sensors...")
         # Create ToF sensors based on config
         tofs = []
-        if config.tof_addrs:  # Use config if available
-            for addr in config.tof_addrs:
-                offset = config.tof_offsets.get(addr, (0, 0))
-                angle = config.tof_angles.get(addr, 0)
+        if tconf.tof_addrs:  # Use config if available
+            for addr in tconf.tof_addrs:
+                offset = tconf.tof_offsets.get(addr, (0, 0))
+                angle = tconf.tof_angles.get(addr, 0)
                 tof = ToF(addr=addr, offset=offset, angle=math.radians(angle), i2c=i2c)
                 tofs.append(tof)
                 print(f"  ✅ ToF sensor at 0x{addr:02x}, angle {angle}°")

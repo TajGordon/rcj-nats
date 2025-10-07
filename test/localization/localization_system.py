@@ -12,7 +12,7 @@ import time
 import threading
 from typing import Dict, Any, List
 import logging
-import config
+import tconf
 
 # FastAPI and web server imports
 from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect  
@@ -30,10 +30,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 try:
-    import config
+    import tconf
 except ImportError:
     print("⚠️  config.py not found, using defaults")
-    config = None
+    tconf = None
 
 try:
     import board
@@ -397,26 +397,26 @@ class LocalizationSystem:
             print("📡 Initializing ToF sensors...")
             tofs = []
             
-            if config and hasattr(config, 'tof_addrs') and config.tof_addrs:
+            if tconf and hasattr(tconf, 'tof_addrs') and tconf.tof_addrs:
                 # Use config if available
-                for i, addr in enumerate(config.tof_addrs):
+                for i, addr in enumerate(tconf.tof_addrs):
                     try:
                         # Handle both list and dict formats for offsets and angles
-                        if hasattr(config, 'tof_offsets'):
-                            if isinstance(config.tof_offsets, list) and i < len(config.tof_offsets):
-                                offset = config.tof_offsets[i]
-                            elif isinstance(config.tof_offsets, dict):
-                                offset = config.tof_offsets.get(addr, 0)
+                        if hasattr(tconf, 'tof_offsets'):
+                            if isinstance(tconf.tof_offsets, list) and i < len(tconf.tof_offsets):
+                                offset = tconf.tof_offsets[i]
+                            elif isinstance(tconf.tof_offsets, dict):
+                                offset = tconf.tof_offsets.get(addr, 0)
                             else:
                                 offset = 0
                         else:
                             offset = 0
                             
-                        if hasattr(config, 'tof_angles'):
-                            if isinstance(config.tof_angles, list) and i < len(config.tof_angles):
-                                angle = math.radians(config.tof_angles[i])
-                            elif isinstance(config.tof_angles, dict):
-                                angle = math.radians(config.tof_angles.get(addr, 0))
+                        if hasattr(tconf, 'tof_angles'):
+                            if isinstance(tconf.tof_angles, list) and i < len(tconf.tof_angles):
+                                angle = math.radians(tconf.tof_angles[i])
+                            elif isinstance(tconf.tof_angles, dict):
+                                angle = math.radians(tconf.tof_angles.get(addr, 0))
                             else:
                                 angle = 0
                         else:

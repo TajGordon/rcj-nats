@@ -10,11 +10,11 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 try:
-    import config
+    import test.localization.tconf as tconf
     print("✅ Config loaded successfully")
-    print(f"   tof_addrs: {config.tof_addrs}")
-    print(f"   tof_offsets: {config.tof_offsets}")
-    print(f"   tof_angles: {config.tof_angles}")
+    print(f"   tof_addrs: {tconf.tof_addrs}")
+    print(f"   tof_offsets: {tconf.tof_offsets}")
+    print(f"   tof_angles: {tconf.tof_angles}")
 except ImportError as e:
     print(f"❌ Config import failed: {e}")
     exit(1)
@@ -42,10 +42,10 @@ except ImportError as e:
 
 # Test config parsing
 print("\n🔧 Testing config parsing...")
-if hasattr(config, 'tof_addrs') and config.tof_addrs:
-    for i, addr in enumerate(config.tof_addrs):
-        offset = config.tof_offsets[i] if i < len(config.tof_offsets) else 0
-        angle = config.tof_angles[i] if i < len(config.tof_angles) else 0
+if hasattr(tconf, 'tof_addrs') and tconf.tof_addrs:
+    for i, addr in enumerate(tconf.tof_addrs):
+        offset = tconf.tof_offsets[i] if i < len(tconf.tof_offsets) else 0
+        angle = tconf.tof_angles[i] if i < len(tconf.tof_angles) else 0
         print(f"   ToF {i}: addr=0x{addr:02x}, offset={offset}mm, angle={angle}°")
 else:
     print("   No tof_addrs found in config")

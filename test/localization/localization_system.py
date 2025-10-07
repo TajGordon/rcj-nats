@@ -12,7 +12,7 @@ import time
 import threading
 from typing import Dict, Any, List
 import logging
-import test.localization.tconf as tconf
+import tconf
 
 # FastAPI and web server imports
 from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect  
@@ -30,7 +30,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 try:
-    import test.localization.tconf as tconf
+    import tconf
 except ImportError:
     print("⚠️  config.py not found, using defaults")
     tconf = None

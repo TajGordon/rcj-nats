@@ -73,7 +73,9 @@ class Localizer:
     def _cast_rays(self, position, bot_angle):
         # goes through each angle and computes the raycast
         distances = {}
+        print(f"self.tof_angles: {self.tof_angles}")
         for angle in self.tof_angles:
+            print(f"casting ray at angle {math.degrees(bot_angle + angle)}")
             dist = self._cast_ray(position, bot_angle + angle)
             distances[angle] = dist
         return distances

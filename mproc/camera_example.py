@@ -26,6 +26,15 @@ from queue import Empty
 import numpy as np
 import queue
 
+from dataclasses import dataclass
+
+@dataclass
+class VisionData:
+    # TODO: add stuff for like ball/goal radius / estimated distance from a regression function
+    ball_found: bool
+    ball_pos: list
+    ball_angle: float
+    goal_localization: np.ndarray # 0 is a goal, and 1 is a goal, set own_goal_idx and opp_goal_idx or something to index
 
 def camera_process(cmd_q, out_q, stop_evt):
     """Camera reading loop that runs in a child process.

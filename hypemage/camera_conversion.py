@@ -5,6 +5,8 @@ This module provides a Camera class that can run in a separate process,
 communicating via queues. It handles Pi Camera initialization, frame capture,
 ball detection, and goal detection.
 
+CRITICAL: Raises CameraInitializationError if camera hardware fails to initialize
+
 Usage:
     from multiprocessing import get_context
     ctx = get_context('spawn')
@@ -31,12 +33,22 @@ import cv2
 import numpy as np
 import math
 
+from hypemage.logger import get_logger
+
+logger = get_logger(__name__)
+
 try:
     from picamera2 import Picamera2
     _HAS_PICAMERA = True
-except ImportError:
+    logger.info("Picamera2 library loaded successfully")
+except ImportError as e:
     _HAS_PICAMERA = False
-    print("Warning: picamera2 not available, falling back to cv2.VideoCapture")
+    logger.warning(f"Picamera2 not available: {e}")
+
+
+class CameraInitializationError(Exception):
+    """Raised when camera initialization fails critically"""
+    pass
 
 
 @dataclass
@@ -67,7 +79,6 @@ class GoalDetectionResult:
     vertical_error: float = 0.0
     is_centered_horizontally: bool = False
 
-
 @dataclass
 class VisionData:
     """Complete vision data output from camera process"""
@@ -94,26 +105,41 @@ class CameraProcess:
                 - goal_detection: blue/yellow goal params
                 - circular_mask: center_x, center_y, radius
                 - frame_config: center_x, center_y
+                
+        Raises:
+            CameraInitializationError: If camera hardware fails to initialize
         """
         self.config = config or self._default_config()
         
         # Initialize camera
-        if _HAS_PICAMERA:
-            self.picam2 = Picamera2()
-            cam_cfg = self.config['camera']
-            self.picam2.configure(self.picam2.create_video_configuration(
-                main={"size": (cam_cfg["width"], cam_cfg["height"]), 
-                      "format": cam_cfg["format"]}
-            ))
-            self.picam2.start()
-            self.capture_fn = self._capture_picamera
-        else:
-            # Fallback to OpenCV
-            self.cap = cv2.VideoCapture(0)
-            cam_cfg = self.config['camera']
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_cfg["width"])
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_cfg["height"])
-            self.capture_fn = self._capture_opencv
+        try:
+            if _HAS_PICAMERA:
+                logger.info("Initializing Picamera2...")
+                self.picam2 = Picamera2()
+                cam_cfg = self.config['camera']
+                self.picam2.configure(self.picam2.create_video_configuration(
+                    main={"size": (cam_cfg["width"], cam_cfg["height"]), 
+                          "format": cam_cfg["format"]}
+                ))
+                self.picam2.start()
+                self.capture_fn = self._capture_picamera
+                logger.info("Picamera2 initialized successfully")
+            else:
+                # Fallback to OpenCV
+                logger.warning("Picamera2 not available, trying OpenCV VideoCapture...")
+                self.cap = cv2.VideoCapture(0)
+                if not self.cap.isOpened():
+                    raise CameraInitializationError("Failed to open camera with OpenCV VideoCapture")
+                
+                cam_cfg = self.config['camera']
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_cfg["width"])
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_cfg["height"])
+                self.capture_fn = self._capture_opencv
+                logger.info("OpenCV VideoCapture initialized successfully")
+                
+        except Exception as e:
+            logger.critical(f"CRITICAL: Failed to initialize camera: {e}", exc_info=True)
+            raise CameraInitializationError(f"Camera initialization failed: {e}")
         
         # Extract config parameters
         ball_cfg = self.config['ball_detection']

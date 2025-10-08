@@ -129,6 +129,7 @@ class MockLocalizer:
     def localize(self):
         self._update_distances()
         angle = math.degrees(self.imu.cur_angle())  # Convert from radians to degrees
+        self.best_error = self._compute_error(self.best_guess, angle)
         
         # Localization algorithm from the real localizer
         move_amount = 32

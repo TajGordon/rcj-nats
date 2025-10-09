@@ -366,11 +366,21 @@ createApp({
                     const widgets = [...state.container.querySelectorAll('.widget:not(.widget-dragging-original)')];
                     let insertBefore = null;
                     let minDistance = Infinity;
+                    let hoveredWidget = null;
+                    
+                    // Clear all previous highlights
+                    widgets.forEach(w => w.classList.remove('drop-zone-highlight'));
                     
                     widgets.forEach(widget => {
                         const rect = widget.getBoundingClientRect();
                         const widgetCenterY = rect.top + rect.height / 2;
                         const distance = Math.abs(e.clientY - widgetCenterY);
+                        
+                        // Check if mouse is over this widget
+                        if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                            hoveredWidget = widget;
+                        }
                         
                         // If cursor is above this widget's center, consider inserting before it
                         if (e.clientY < widgetCenterY && distance < minDistance) {
@@ -378,6 +388,11 @@ createApp({
                             insertBefore = widget;
                         }
                     });
+                    
+                    // Highlight the widget we're hovering over
+                    if (hoveredWidget) {
+                        hoveredWidget.classList.add('drop-zone-highlight');
+                    }
                     
                     // Move placeholder to the calculated position
                     if (insertBefore && insertBefore !== state.placeholder) {
@@ -390,6 +405,12 @@ createApp({
                 
                 function finishDragging(state) {
                     if (!state.element || !state.placeholder) return;
+                    
+                    // Clear all highlights
+                    if (state.container) {
+                        const widgets = [...state.container.querySelectorAll('.widget')];
+                        widgets.forEach(w => w.classList.remove('drop-zone-highlight'));
+                    }
                     
                     // Remove clone with fade animation
                     if (state.clone) {

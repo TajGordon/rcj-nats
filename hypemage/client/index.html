@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Control Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Robot Control Dashboard</h1>
+            <div class="connection-status">
+                <span id="status-indicator" class="disconnected"></span>
+                <span id="status-text">Disconnected</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- Control Panel -->
+            <section class="panel controls-panel">
+                <h2>Control</h2>
+                <div class="button-group">
+                    <button id="btn-start-debug" class="btn btn-primary">
+                        ▶️ Start Robot (Debug)
+                    </button>
+                    <button id="btn-start-production" class="btn btn-secondary">
+                        ▶️ Start Robot (Production)
+                    </button>
+                    <button id="btn-stop" class="btn btn-danger" disabled>
+                        ⏹️ Stop Robot
+                    </button>
+                </div>
+                <div class="status-info">
+                    <p><strong>Status:</strong> <span id="robot-status">Stopped</span></p>
+                    <p><strong>PID:</strong> <span id="robot-pid">-</span></p>
+                    <p><strong>Debug:</strong> <span id="debug-status">Disabled</span></p>
+                </div>
+            </section>
+
+            <!-- Utilities Panel -->
+            <section class="panel utilities-panel">
+                <h2>Utilities</h2>
+                <div class="button-group">
+                    <button id="btn-color-ball" class="btn btn-secondary">
+                        🎨 Calibrate Ball Color
+                    </button>
+                    <button id="btn-color-blue" class="btn btn-secondary">
+                        🎨 Calibrate Blue Goal
+                    </button>
+                    <button id="btn-color-yellow" class="btn btn-secondary">
+                        🎨 Calibrate Yellow Goal
+                    </button>
+                    <button id="btn-motor-test" class="btn btn-secondary">
+                        ⚙️ Motor Test
+                    </button>
+                </div>
+            </section>
+
+            <!-- Camera Feed (only visible when debug enabled) -->
+            <section class="panel camera-panel" id="camera-panel" style="display: none;">
+                <h2>Camera Feed</h2>
+                <div class="camera-container">
+                    <img id="camera-feed" src="" alt="Camera feed will appear here when debug mode is active">
+                    <div class="camera-info">
+                        <span>FPS: <span id="camera-fps">0</span></span>
+                        <span>Frame: <span id="camera-frame">0</span></span>
+                    </div>
+                </div>
+                <div class="detection-info">
+                    <div class="detection-item">
+                        <span class="detection-label">Ball:</span>
+                        <span id="ball-status" class="detection-status">Not detected</span>
+                    </div>
+                    <div class="detection-item">
+                        <span class="detection-label">Blue Goal:</span>
+                        <span id="blue-goal-status" class="detection-status">Not detected</span>
+                    </div>
+                    <div class="detection-item">
+                        <span class="detection-label">Yellow Goal:</span>
+                        <span id="yellow-goal-status" class="detection-status">Not detected</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Motor Status (only visible when debug enabled) -->
+            <section class="panel motor-panel" id="motor-panel" style="display: none;">
+                <h2>Motor Status</h2>
+                <div class="motor-gauges">
+                    <div class="gauge">
+                        <div class="gauge-label">Motor 1</div>
+                        <div class="gauge-bar">
+                            <div id="motor-1" class="gauge-fill" style="width: 50%"></div>
+                        </div>
+                        <div class="gauge-value" id="motor-1-val">0.0</div>
+                    </div>
+                    <div class="gauge">
+                        <div class="gauge-label">Motor 2</div>
+                        <div class="gauge-bar">
+                            <div id="motor-2" class="gauge-fill" style="width: 50%"></div>
+                        </div>
+                        <div class="gauge-value" id="motor-2-val">0.0</div>
+                    </div>
+                    <div class="gauge">
+                        <div class="gauge-label">Motor 3</div>
+                        <div class="gauge-bar">
+                            <div id="motor-3" class="gauge-fill" style="width: 50%"></div>
+                        </div>
+                        <div class="gauge-value" id="motor-3-val">0.0</div>
+                    </div>
+                    <div class="gauge">
+                        <div class="gauge-label">Motor 4</div>
+                        <div class="gauge-bar">
+                            <div id="motor-4" class="gauge-fill" style="width: 50%"></div>
+                        </div>
+                        <div class="gauge-value" id="motor-4-val">0.0</div>
+                    </div>
+                </div>
+                <div class="motor-info">
+                    <p><strong>Watchdog:</strong> <span id="watchdog-status">Active</span></p>
+                </div>
+            </section>
+
+            <!-- Logs Panel -->
+            <section class="panel logs-panel">
+                <h2>Recent Logs</h2>
+                <button id="btn-refresh-logs" class="btn btn-small">🔄 Refresh</button>
+                <div id="logs-container" class="logs-container">
+                    <p class="log-placeholder">Logs will appear here...</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

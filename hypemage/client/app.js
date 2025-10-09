@@ -252,14 +252,17 @@ createApp({
                     // Don't drag if clicking on interactive elements or resize handle
                     if (e.target.closest('button, input, img, .logs-container')) return;
                     
-                    // Don't drag if clicking on resize corner (bottom-right 30px area)
-                    const rect = widget.getBoundingClientRect();
-                    const isResizeCorner = (
-                        e.clientX > rect.right - 30 && 
-                        e.clientY > rect.bottom - 30 &&
-                        widget.classList.contains('widget-resizable')
-                    );
-                    if (isResizeCorner) return;
+                    // Don't drag if clicking near any resize edge (40px from any edge)
+                    if (widget.classList.contains('widget-resizable')) {
+                        const rect = widget.getBoundingClientRect();
+                        const isNearResizeEdge = (
+                            (e.clientX > rect.right - 40) ||   // Right edge
+                            (e.clientX < rect.left + 40) ||    // Left edge
+                            (e.clientY > rect.bottom - 40) ||  // Bottom edge
+                            (e.clientY < rect.top + 40)        // Top edge
+                        );
+                        if (isNearResizeEdge) return;
+                    }
                     
                     // Initialize drag state
                     dragState.element = widget;

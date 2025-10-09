@@ -110,16 +110,28 @@ body {
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
     align-items: start;
+}
+
+/* Smooth layout transitions for all widgets (not during resize) */
+.widgets-container > *:not(.widget-resizable) {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Smooth layout transitions for all widgets */
-.widgets-container > * {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* Both view uses grid (2 columns) */
+.both-view .widgets-container {
+    grid-template-columns: repeat(2, 1fr);
 }
 
-.widgets-container.expanded {
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+/* Single view uses flexbox to prevent resize overlap */
+.single-view .widgets-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.single-view .widget {
+    width: 100%;
+    flex-shrink: 0;
 }
 
 /* Resizable widgets in single view */
@@ -259,10 +271,38 @@ body {
 /* Resize handle */
 .widget-resizable {
     resize: both;
-    overflow: auto;
+    overflow: hidden;
     min-width: 300px;
     min-height: 300px;
+    max-width: 100%;
     transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Logs widget resize - ensure content fills space */
+.logs-widget.widget-resizable {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.logs-widget.widget-resizable .logs-container {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Camera widget resize - remove aspect ratio constraint */
+.widget-resizable.camera-widget img {
+    aspect-ratio: unset;
+    max-height: calc(100% - 4rem);
+    width: 100%;
+    object-fit: contain;
+}
+
+.widget-resizable.camera-widget .no-feed {
+    aspect-ratio: unset;
+    min-height: 200px;
+    flex: 1;
 }
 
 .widget-resizable:hover::after {
@@ -300,8 +340,8 @@ body {
     position: absolute;
     bottom: 0;
     right: 0;
-    width: 30px;
-    height: 30px;
+    width: 40px;
+    height: 40px;
     cursor: nwse-resize;
     z-index: 100;
 }

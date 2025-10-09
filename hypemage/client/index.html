@@ -43,7 +43,7 @@
                         </div>
                         
                         <!-- Camera -->
-                        <div v-if="storm.visibleWidgets.has('camera')" class="widget camera-widget">
+                        <div v-if="storm.visibleWidgets.has('camera')" class="widget widget-resizable camera-widget">
                             <h3>📷 Camera <span v-if="storm.camera.fps">{{ storm.camera.fps }} FPS</span></h3>
                             <img v-if="storm.camera.frame" :src="storm.camera.frame" alt="Camera feed">
                             <div v-else class="no-feed">No camera feed</div>
@@ -64,7 +64,7 @@
                         </div>
                         
                         <!-- Logs -->
-                        <div v-if="storm.visibleWidgets.has('logs')" class="widget logs-widget">
+                        <div v-if="storm.visibleWidgets.has('logs')" class="widget widget-resizable logs-widget">
                             <h3>📝 Logs</h3>
                             <div class="logs-container">
                                 <div v-if="storm.logs.length === 0" class="no-logs">No logs yet...</div>
@@ -100,7 +100,7 @@
                         </div>
                         
                         <!-- Camera -->
-                        <div v-if="necron.visibleWidgets.has('camera')" class="widget camera-widget">
+                        <div v-if="necron.visibleWidgets.has('camera')" class="widget widget-resizable camera-widget">
                             <h3>📷 Camera <span v-if="necron.camera.fps">{{ necron.camera.fps }} FPS</span></h3>
                             <img v-if="necron.camera.frame" :src="necron.camera.frame" alt="Camera feed">
                             <div v-else class="no-feed">No camera feed</div>
@@ -121,7 +121,7 @@
                         </div>
                         
                         <!-- Logs -->
-                        <div v-if="necron.visibleWidgets.has('logs')" class="widget logs-widget">
+                        <div v-if="necron.visibleWidgets.has('logs')" class="widget widget-resizable logs-widget">
                             <h3>📝 Logs</h3>
                             <div class="logs-container">
                                 <div v-if="necron.logs.length === 0" class="no-logs">No logs yet...</div>

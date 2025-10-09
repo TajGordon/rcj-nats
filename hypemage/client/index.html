@@ -3,133 +3,218 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Robot Control Dashboard</title>
+    <title>Multi-Robot Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🤖 Robot Control Dashboard</h1>
-            <div class="connection-status">
-                <span id="status-indicator" class="disconnected"></span>
-                <span id="status-text">Disconnected</span>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>🤖 Multi-Robot Dashboard</h1>
+            <div class="connection-badges">
+                <span :class="['badge', storm.connected ? 'connected' : 'disconnected']">
+                    Storm {{ storm.connected ? '✓' : '✗' }}
+                </span>
+                <span :class="['badge', necron.connected ? 'connected' : 'disconnected']">
+                    Necron {{ necron.connected ? '✓' : '✗' }}
+                </span>
             </div>
         </header>
 
-        <main>
-            <!-- Control Panel -->
-            <section class="panel controls-panel">
-                <h2>Control</h2>
-                <div class="button-group">
-                    <button id="btn-start-debug" class="btn btn-primary">
-                        ▶️ Start Robot (Debug)
-                    </button>
-                    <button id="btn-start-production" class="btn btn-secondary">
-                        ▶️ Start Robot (Production)
-                    </button>
-                    <button id="btn-stop" class="btn btn-danger" disabled>
-                        ⏹️ Stop Robot
-                    </button>
-                </div>
-                <div class="status-info">
-                    <p><strong>Status:</strong> <span id="robot-status">Stopped</span></p>
-                    <p><strong>PID:</strong> <span id="robot-pid">-</span></p>
-                    <p><strong>Debug:</strong> <span id="debug-status">Disabled</span></p>
-                </div>
-            </section>
-
-            <!-- Utilities Panel -->
-            <section class="panel utilities-panel">
-                <h2>Utilities</h2>
-                <div class="button-group">
-                    <button id="btn-color-ball" class="btn btn-secondary">
-                        🎨 Calibrate Ball Color
-                    </button>
-                    <button id="btn-color-blue" class="btn btn-secondary">
-                        🎨 Calibrate Blue Goal
-                    </button>
-                    <button id="btn-color-yellow" class="btn btn-secondary">
-                        🎨 Calibrate Yellow Goal
-                    </button>
-                    <button id="btn-motor-test" class="btn btn-secondary">
-                        ⚙️ Motor Test
-                    </button>
-                </div>
-            </section>
-
-            <!-- Camera Feed (only visible when debug enabled) -->
-            <section class="panel camera-panel" id="camera-panel" style="display: none;">
-                <h2>Camera Feed</h2>
-                <div class="camera-container">
-                    <img id="camera-feed" src="" alt="Camera feed will appear here when debug mode is active">
-                    <div class="camera-info">
-                        <span>FPS: <span id="camera-fps">0</span></span>
-                        <span>Frame: <span id="camera-frame">0</span></span>
-                    </div>
-                </div>
-                <div class="detection-info">
-                    <div class="detection-item">
-                        <span class="detection-label">Ball:</span>
-                        <span id="ball-status" class="detection-status">Not detected</span>
-                    </div>
-                    <div class="detection-item">
-                        <span class="detection-label">Blue Goal:</span>
-                        <span id="blue-goal-status" class="detection-status">Not detected</span>
-                    </div>
-                    <div class="detection-item">
-                        <span class="detection-label">Yellow Goal:</span>
-                        <span id="yellow-goal-status" class="detection-status">Not detected</span>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Motor Status (only visible when debug enabled) -->
-            <section class="panel motor-panel" id="motor-panel" style="display: none;">
-                <h2>Motor Status</h2>
-                <div class="motor-gauges">
-                    <div class="gauge">
-                        <div class="gauge-label">Motor 1</div>
-                        <div class="gauge-bar">
-                            <div id="motor-1" class="gauge-fill" style="width: 50%"></div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Both View -->
+            <div v-if="currentView === 'both'" class="both-view">
+                <div class="robot-column">
+                    <h2 class="robot-title">⚡ Storm</h2>
+                    <div class="widgets-container">
+                        <!-- Controls -->
+                        <div v-if="storm.visibleWidgets.has('controls')" class="widget">
+                            <h3>🎮 Control</h3>
+                            <div class="button-group">
+                                <button @click="startRobotDebug('storm')" :disabled="storm.status === 'running'" class="btn btn-primary">▶️ Debug</button>
+                                <button @click="stopRobot('storm')" :disabled="storm.status !== 'running'" class="btn btn-danger">⏹️ Stop</button>
+                            </div>
+                            <div class="status-info">
+                                <p><strong>Status:</strong> {{ storm.status }}</p>
+                                <p><strong>PID:</strong> {{ storm.pid || '-' }}</p>
+                            </div>
                         </div>
-                        <div class="gauge-value" id="motor-1-val">0.0</div>
-                    </div>
-                    <div class="gauge">
-                        <div class="gauge-label">Motor 2</div>
-                        <div class="gauge-bar">
-                            <div id="motor-2" class="gauge-fill" style="width: 50%"></div>
+                        
+                        <!-- Camera -->
+                        <div v-if="storm.visibleWidgets.has('camera')" class="widget camera-widget">
+                            <h3>📷 Camera <span v-if="storm.camera.fps">{{ storm.camera.fps }} FPS</span></h3>
+                            <img v-if="storm.camera.frame" :src="storm.camera.frame" alt="Camera feed">
+                            <div v-else class="no-feed">No camera feed</div>
                         </div>
-                        <div class="gauge-value" id="motor-2-val">0.0</div>
-                    </div>
-                    <div class="gauge">
-                        <div class="gauge-label">Motor 3</div>
-                        <div class="gauge-bar">
-                            <div id="motor-3" class="gauge-fill" style="width: 50%"></div>
+                        
+                        <!-- Motors -->
+                        <div v-if="storm.visibleWidgets.has('motors')" class="widget">
+                            <h3>⚙️ Motors</h3>
+                            <div class="motors-grid">
+                                <div v-for="(speed, i) in storm.motors.speeds" :key="i" class="motor-item">
+                                    <div class="motor-label">M{{ i }}</div>
+                                    <div class="motor-bar">
+                                        <div class="motor-fill" :style="{width: Math.abs(speed) + '%', backgroundColor: speed >= 0 ? '#00ff88' : '#ff4444'}"></div>
+                                    </div>
+                                    <div class="motor-value">{{ speed }}%</div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="gauge-value" id="motor-3-val">0.0</div>
-                    </div>
-                    <div class="gauge">
-                        <div class="gauge-label">Motor 4</div>
-                        <div class="gauge-bar">
-                            <div id="motor-4" class="gauge-fill" style="width: 50%"></div>
+                        
+                        <!-- Status -->
+                        <div v-if="storm.visibleWidgets.has('status')" class="widget">
+                            <h3>ℹ️ Status</h3>
+                            <p><strong>Host:</strong> {{ storm.host }}</p>
+                            <p><strong>Connected:</strong> {{ storm.connected ? 'Yes' : 'No' }}</p>
                         </div>
-                        <div class="gauge-value" id="motor-4-val">0.0</div>
                     </div>
                 </div>
-                <div class="motor-info">
-                    <p><strong>Watchdog:</strong> <span id="watchdog-status">Active</span></p>
+                
+                <div class="robot-column">
+                    <h2 class="robot-title">💀 Necron</h2>
+                    <div class="widgets-container">
+                        <!-- Controls -->
+                        <div v-if="necron.visibleWidgets.has('controls')" class="widget">
+                            <h3>🎮 Control</h3>
+                            <div class="button-group">
+                                <button @click="startRobotDebug('necron')" :disabled="necron.status === 'running'" class="btn btn-primary">▶️ Debug</button>
+                                <button @click="stopRobot('necron')" :disabled="necron.status !== 'running'" class="btn btn-danger">⏹️ Stop</button>
+                            </div>
+                            <div class="status-info">
+                                <p><strong>Status:</strong> {{ necron.status }}</p>
+                                <p><strong>PID:</strong> {{ necron.pid || '-' }}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Camera -->
+                        <div v-if="necron.visibleWidgets.has('camera')" class="widget camera-widget">
+                            <h3>📷 Camera <span v-if="necron.camera.fps">{{ necron.camera.fps }} FPS</span></h3>
+                            <img v-if="necron.camera.frame" :src="necron.camera.frame" alt="Camera feed">
+                            <div v-else class="no-feed">No camera feed</div>
+                        </div>
+                        
+                        <!-- Motors -->
+                        <div v-if="necron.visibleWidgets.has('motors')" class="widget">
+                            <h3>⚙️ Motors</h3>
+                            <div class="motors-grid">
+                                <div v-for="(speed, i) in necron.motors.speeds" :key="i" class="motor-item">
+                                    <div class="motor-label">M{{ i }}</div>
+                                    <div class="motor-bar">
+                                        <div class="motor-fill" :style="{width: Math.abs(speed) + '%', backgroundColor: speed >= 0 ? '#00ff88' : '#ff4444'}"></div>
+                                    </div>
+                                    <div class="motor-value">{{ speed }}%</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Status -->
+                        <div v-if="necron.visibleWidgets.has('status')" class="widget">
+                            <h3>ℹ️ Status</h3>
+                            <p><strong>Host:</strong> {{ necron.host }}</p>
+                            <p><strong>Connected:</strong> {{ necron.connected ? 'Yes' : 'No' }}</p>
+                        </div>
+                    </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- Logs Panel -->
-            <section class="panel logs-panel">
-                <h2>Recent Logs</h2>
-                <button id="btn-refresh-logs" class="btn btn-small">🔄 Refresh</button>
-                <div id="logs-container" class="logs-container">
-                    <p class="log-placeholder">Logs will appear here...</p>
+            <!-- Storm Single View -->
+            <div v-if="currentView === 'storm'" class="single-view">
+                <h2 class="robot-title">⚡ Storm - Detailed View</h2>
+                <div class="widgets-container expanded">
+                    <div v-if="storm.visibleWidgets.has('controls')" class="widget">
+                        <h3>🎮 Control</h3>
+                        <div class="button-group">
+                            <button @click="startRobotDebug('storm')" :disabled="storm.status === 'running'" class="btn btn-primary">▶️ Debug</button>
+                            <button @click="stopRobot('storm')" :disabled="storm.status !== 'running'" class="btn btn-danger">⏹️ Stop</button>
+                        </div>
+                        <div class="status-info">
+                            <p><strong>Status:</strong> {{ storm.status }}</p>
+                            <p><strong>PID:</strong> {{ storm.pid || '-' }}</p>
+                        </div>
+                    </div>
+                    <div v-if="storm.visibleWidgets.has('camera')" class="widget camera-widget">
+                        <h3>📷 Camera <span v-if="storm.camera.fps">{{ storm.camera.fps }} FPS</span></h3>
+                        <img v-if="storm.camera.frame" :src="storm.camera.frame" alt="Camera feed">
+                        <div v-else class="no-feed">No camera feed</div>
+                    </div>
+                    <div v-if="storm.visibleWidgets.has('motors')" class="widget">
+                        <h3>⚙️ Motors</h3>
+                        <div class="motors-grid">
+                            <div v-for="(speed, i) in storm.motors.speeds" :key="i" class="motor-item">
+                                <div class="motor-label">M{{ i }}</div>
+                                <div class="motor-bar">
+                                    <div class="motor-fill" :style="{width: Math.abs(speed) + '%', backgroundColor: speed >= 0 ? '#00ff88' : '#ff4444'}"></div>
+                                </div>
+                                <div class="motor-value">{{ speed }}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="storm.visibleWidgets.has('status')" class="widget">
+                        <h3>ℹ️ Status</h3>
+                        <p><strong>Host:</strong> {{ storm.host }}</p>
+                        <p><strong>Connected:</strong> {{ storm.connected ? 'Yes' : 'No' }}</p>
+                    </div>
                 </div>
-            </section>
+            </div>
+
+            <!-- Necron Single View -->
+            <div v-if="currentView === 'necron'" class="single-view">
+                <h2 class="robot-title">💀 Necron - Detailed View</h2>
+                <div class="widgets-container expanded">
+                    <div v-if="necron.visibleWidgets.has('controls')" class="widget">
+                        <h3>🎮 Control</h3>
+                        <div class="button-group">
+                            <button @click="startRobotDebug('necron')" :disabled="necron.status === 'running'" class="btn btn-primary">▶️ Debug</button>
+                            <button @click="stopRobot('necron')" :disabled="necron.status !== 'running'" class="btn btn-danger">⏹️ Stop</button>
+                        </div>
+                        <div class="status-info">
+                            <p><strong>Status:</strong> {{ necron.status }}</p>
+                            <p><strong>PID:</strong> {{ necron.pid || '-' }}</p>
+                        </div>
+                    </div>
+                    <div v-if="necron.visibleWidgets.has('camera')" class="widget camera-widget">
+                        <h3>📷 Camera <span v-if="necron.camera.fps">{{ necron.camera.fps }} FPS</span></h3>
+                        <img v-if="necron.camera.frame" :src="necron.camera.frame" alt="Camera feed">
+                        <div v-else class="no-feed">No camera feed</div>
+                    </div>
+                    <div v-if="necron.visibleWidgets.has('motors')" class="widget">
+                        <h3>⚙️ Motors</h3>
+                        <div class="motors-grid">
+                            <div v-for="(speed, i) in necron.motors.speeds" :key="i" class="motor-item">
+                                <div class="motor-label">M{{ i }}</div>
+                                <div class="motor-bar">
+                                    <div class="motor-fill" :style="{width: Math.abs(speed) + '%', backgroundColor: speed >= 0 ? '#00ff88' : '#ff4444'}"></div>
+                                </div>
+                                <div class="motor-value">{{ speed }}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="necron.visibleWidgets.has('status')" class="widget">
+                        <h3>ℹ️ Status</h3>
+                        <p><strong>Host:</strong> {{ necron.host }}</p>
+                        <p><strong>Connected:</strong> {{ necron.connected ? 'Yes' : 'No' }}</p>
+                    </div>
+                </div>
+            </div>
         </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="view-switcher">
+                <button :class="['view-btn', {active: currentView === 'both'}]" @click="currentView = 'both'">Both</button>
+                <button :class="['view-btn', {active: currentView === 'storm'}]" @click="currentView = 'storm'">Storm</button>
+                <button :class="['view-btn', {active: currentView === 'necron'}]" @click="currentView = 'necron'">Necron</button>
+            </div>
+            <div class="widget-toggles">
+                <span class="toggle-label">Show:</span>
+                <label v-for="widget in availableWidgets" :key="widget.id" class="toggle">
+                    <input type="checkbox" :checked="isWidgetVisible(currentView, widget.id)" @change="toggleWidgetForCurrentView(widget.id)">
+                    <span>{{ widget.icon }} {{ widget.name }}</span>
+                </label>
+            </div>
+        </footer>
     </div>
 
     <script src="app.js"></script>

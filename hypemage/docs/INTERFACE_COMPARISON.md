@@ -1,69 +1,12 @@
-# Interface Architecture Comparison
+# Interface Architecture - Design Decisions
 
-## The Question
+## Overview
 
-**Should we use FastAPI or raw WebSockets? Why have production mode in interface?**
+The interface system uses FastAPI for remote robot control with a generic script launcher.
 
-## TL;DR - Recommendations
+## Architecture
 
-1. ✅ **Use FastAPI** (you already use it everywhere else)
-2. ✅ **Make script launcher generic** (not hardcoded to scylla)
-3. ⚠️ **Production mode is optional** (useful for remote start, but not critical)
-4. ✅ **HTTP streaming for camera** (faster than WebSocket for video)
-
----
-
-## Architecture V1 vs V2
-
-### V1 (Current - `interface.py`)
-
-```python
-class InterfaceServer:
-    def __init__(self):
-        self.commands = {
-            'scylla_debug': self._scylla_debug,          # Hardcoded
-            'scylla_production': self._scylla_production, # Hardcoded
-            'color_calibration': self._color_calibration, # Hardcoded
-            'motor_test': self._motor_test,               # Hardcoded
-        }
-```
-
-**Problems:**
-- ❌ Adding new script requires code changes
-- ❌ Can't pass custom arguments easily
-- ❌ Hardcoded to scylla (what about other scripts?)
-- ❌ Raw WebSocket server (reinventing the wheel)
-
-### V2 (Proposed - `interface_v2.py`)
-
-```python
-class InterfaceServer:
-    def __init__(self):
-        self.scripts = {
-            'scylla_debug': ScriptConfig(...),
-            'color_calibration': ScriptConfig(...),
-            'motor_test': ScriptConfig(...),
-            'imu_calibration': ScriptConfig(...),
-            # Add more easily!
-        }
-    
-    async def run_script(self, script_id: str, extra_args: List[str]):
-        """Generic launcher - works for ANY script"""
-        ...
-```
-
-**Benefits:**
-- ✅ Generic script launcher (add via config, not code)
-- ✅ Easy to add new scripts (just add to dictionary)
-- ✅ Can pass custom arguments
-- ✅ Uses FastAPI (standard library you already use)
-- ✅ REST API + WebSocket in one server
-
----
-
-## Performance Comparison
-
-### Video Streaming
+**`interface.py`** - FastAPI-based interface server
 
 | Method | Bandwidth | Latency | Code Complexity |
 |--------|-----------|---------|-----------------|

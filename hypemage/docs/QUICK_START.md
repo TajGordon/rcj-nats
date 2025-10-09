@@ -1,71 +1,85 @@
-# Quick Start Guide - Interface System
+# Interface System - Quick Start
 
-## 🚀 Getting Started in 5 Minutes
+## One Command Setup
 
-### On the Robot (Raspberry Pi)
+### On the Robot
 
 ```bash
-# 1. Navigate to project
-cd ~/rcj-nats
+# 1. Install dependencies (if not already)
+pip install fastapi uvicorn
 
-# 2. Start interface server
+# 2. Start the interface
 python -m hypemage.interface
+```
 
-# You should see:
-# INFO - Interface server listening on ws://0.0.0.0:8080
-# INFO - Clients can connect to control robot
+**Output:**
+```
+Starting Robot Interface Server
+Dashboard: http://0.0.0.0:8080
+WebSocket: ws://0.0.0.0:8080/ws
 ```
 
 ### On Your Laptop/Phone
 
-```bash
-# Option 1: If you have the client files on robot
-# Just open browser to: http://robot.local:8080
-
-# Option 2: If you need to copy client files to robot first
-scp -r hypemage/client/* pi@robot.local:~/rcj-nats/hypemage/client/
+```
+Open browser to: http://robot-ip:8080
 ```
 
-**Then open browser**: `http://robot.local:8080/client/index.html`
+**Done!** You can now control the robot from the web dashboard.
 
 ---
 
-## 📱 Using the Dashboard
+## What You Can Do
 
-### Starting the Robot
+### Start Robot in Debug Mode
 
-1. Click **"▶️ Start Robot (Debug)"**
-   - Robot starts with debug enabled
-   - Camera feed will appear
-   - Motor status will update
+1. Click **"Robot (Debug)"** button
+2. Robot starts with debug output
+3. See camera feed and motor status (when implemented)
 
-2. OR click **"▶️ Start Robot (Production)"**
-   - Robot starts without debug overhead
-   - Use for competition
+### Run Calibration
 
-### Stopping the Robot
+1. Click **"Color Calibration"** button  
+2. Calibrate HSV ranges for ball/goal detection
 
-- Click **"⏹️ Stop Robot"**
-- Robot will shut down gracefully
+### Test Motors
 
-### Utilities
+1. Click **"Motor Test"** button
+2. Test individual motor control
 
-- **🎨 Calibrate Ball Color**: Opens HSV color calibration tool
-- **🎨 Calibrate Blue/Yellow Goal**: Same for goals
-- **⚙️ Motor Test**: Launches motor test script
+### Stop Everything
+
+1. Click **"Stop"** button
+2. Current process terminates gracefully
 
 ---
 
-## 🔧 Auto-Start on Boot
+## Adding Your Own Scripts
 
-To make interface start automatically when robot boots:
+Edit `hypemage/interface.py`:
+
+```python
+# Around line 58, add to self.scripts:
+'my_script': ScriptConfig(
+    name='My Cool Script',
+    module='path.to.my_script',
+    args=[],
+    description='What it does',
+    category='test'  # or 'calibration', 'robot', 'utility'
+),
+```
+
+Restart interface, script appears in dashboard automatically!
+
+---
+
+## Auto-Start on Boot
 
 ```bash
-# 1. Create systemd service file
 sudo nano /etc/systemd/system/robot-interface.service
 ```
 
-Paste this:
+Paste:
 ```ini
 [Unit]
 Description=Robot Interface Server
@@ -77,211 +91,60 @@ User=pi
 WorkingDirectory=/home/pi/rcj-nats
 ExecStart=/usr/bin/python3 -m hypemage.interface
 Restart=always
-RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+Enable:
 ```bash
-# 2. Enable and start
-sudo systemctl enable robot-interface.service
-sudo systemctl start robot-interface.service
-
-# 3. Check status
-sudo systemctl status robot-interface.service
-```
-
-Now interface starts automatically on boot!
-
----
-
-## 🤖 Multiple Robots (Necron & Storm)
-
-### Setup
-
-**On Necron**:
-```bash
-ssh pi@necron.local
-cd ~/rcj-nats
-python -m hypemage.interface
-```
-
-**On Storm**:
-```bash
-ssh pi@storm.local
-cd ~/rcj-nats
-python -m hypemage.interface
-```
-
-### Access
-
-Open browser with **two tabs**:
-- Tab 1: `http://necron.local:8080/client/index.html`
-- Tab 2: `http://storm.local:8080/client/index.html`
-
-Control each independently!
-
----
-
-## 🛠️ Adding Custom Scripts
-
-Edit `hypemage/interface.py`:
-
-```python
-def __init__(self):
-    self.commands = {
-        # ... existing commands ...
-        'my_custom_script': self._my_custom_script,  # Add this
-    }
-
-def _my_custom_script(self, args):
-    """Launch custom script"""
-    try:
-        proc = subprocess.Popen([
-            sys.executable, 
-            '-m', 
-            'my_module.my_script'
-        ])
-        return {'success': True, 'pid': proc.pid}
-    except Exception as e:
-        return {'success': False, 'error': str(e)}
-```
-
-Use from client JavaScript:
-```javascript
-// Add button in index.html
-<button id="btn-custom">My Script</button>
-
-// Add handler in app.js
-document.getElementById('btn-custom').addEventListener('click', () => {
-    sendCommand('my_custom_script');
-});
+sudo systemctl enable robot-interface
+sudo systemctl start robot-interface
 ```
 
 ---
 
-## 📊 Debug Data
+## Competition Mode
 
-When robot is started with debug:
+**Don't use interface in competition!** Just boot directly to scylla:
 
-### WebSocket Ports
-- **8080**: Commands & status (interface server)
-- **8765**: Debug data (camera, motors, etc.)
+```bash
+# Remove interface from startup
+sudo systemctl disable robot-interface
 
-### Client Auto-Connects
-- Client connects to both ports automatically
-- Camera feed updates in real-time
-- Motor speeds show as gauges
+# Create scylla service instead
+sudo nano /etc/systemd/system/robot.service
+```
 
-### Debug Data Types
-- `CameraDebugData`: Frame, FPS, detections, HSV ranges
-- `MotorDebugData`: Speeds, watchdog status
-- `LocalizationDebugData`: Position, heading, confidence
-- `ButtonDebugData`: Button states, last press
-- `FSMDebugData`: Current state, component status
+```ini
+[Service]
+ExecStart=/usr/bin/python3 -m hypemage.scylla
+```
+
+Interface is for **development**, not competition.
 
 ---
 
-## 🔒 Security (Competition Mode)
+## File Structure
 
-For competition (public networks):
-
-1. **Bind to localhost only**:
-   ```python
-   # In interface.py main():
-   asyncio.run(server.run(host='127.0.0.1', port=8080))
-   ```
-
-2. **SSH tunnel from laptop**:
-   ```bash
-   ssh -L 8080:localhost:8080 pi@robot.local
-   ```
-
-3. **Access via tunnel**:
-   - Browser: `http://localhost:8080`
-   - Tunnels to robot securely
-
----
-
-## 🐛 Troubleshooting
-
-### "Cannot connect to interface server"
-
-```bash
-# Check interface is running
-ssh pi@robot.local
-ps aux | grep interface.py
-
-# If not running, start it
-python -m hypemage.interface
 ```
-
-### "No camera feed in debug mode"
-
-```bash
-# Check robot is running in debug mode
-# Look for: "Debug server listening on ws://0.0.0.0:8765"
-
-# Check browser console (F12)
-# Should see: "Connected to debug server"
-```
-
-### "Robot won't stop"
-
-```bash
-# Force stop
-ssh pi@robot.local
-pkill -f scylla.py
-
-# Check what's running
-ps aux | grep python
-```
-
-### Check Logs
-
-```bash
-# On robot
-tail -f ~/robot_logs/robot.log
-
-# Or from client
-# Click "🔄 Refresh" in Logs panel
+hypemage/
+├── interface.py              # ⭐ Main server (run this)
+├── client/                   # Web dashboard
+│   ├── index.html
+│   ├── app.js
+│   └── style.css
+└── docs/
+    ├── INTERFACE_README.md   # Detailed guide
+    └── QUICK_START.md        # This file
 ```
 
 ---
 
-## 📝 Example Workflow
+## That's It!
 
-**Testing a new feature**:
+- **Start:** `python -m hypemage.interface`
+- **Use:** `http://robot:8080`
+- **Add scripts:** Edit `interface.py` → `self.scripts` dictionary
 
-1. SSH to robot, start interface
-2. Open dashboard on laptop
-3. Click "Start Robot (Debug)"
-4. Watch camera feed, see detections
-5. Adjust code, click "Stop Robot"
-6. Restart to test changes
-7. Review logs for errors
-
-**Competition day**:
-
-1. Set interface to auto-start on boot
-2. Turn on robot, interface starts automatically
-3. Connect laptop to robot's network
-4. Open dashboard
-5. Click "Start Robot (Production)"
-6. Robot runs, no debug overhead
-
----
-
-## ✅ What You Have Now
-
-- ✅ Interface server (`interface.py`)
-- ✅ Web dashboard (`client/`)
-- ✅ Start/stop robot remotely
-- ✅ Debug data streaming (camera, motors)
-- ✅ Extensible command system
-- ✅ Multi-robot ready
-- ✅ Auto-start on boot (systemd)
-- ✅ Secure tunnel option
-
-**Everything works with simplicity at heart** ❤️
+Simple, clean, one file. No version confusion. 🎯

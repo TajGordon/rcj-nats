@@ -1,26 +1,8 @@
-# Interface System - Quick Decision Guide
+# Robot Interface System - Quick Guide
 
-## Your Questions
+## Overview
 
-1. **Should interface launch production mode?**
-   - Answer: Useful for development, but competition should boot directly to scylla
-   
-2. **Isn't hardcoded commands not modular?**
-   - Answer: You're right! Use ScriptConfig pattern instead
-   
-3. **Should it use FastAPI?**
-   - Answer: YES! You already use it everywhere else
-   
-4. **Is WebSocket faster than HTTP for video?**
-   - Answer: NO! HTTP multipart is 25% faster (your camera servers already use it)
-
----
-
-## What I Created for You
-
-### Files Created
-
-1. **`interface_v2.py`** - New FastAPI-based interface
+Single, clean interface server using FastAPI for remote robot control.
    - ✅ Generic script launcher (not hardcoded)
    - ✅ FastAPI (consistent with your codebase)
    - ✅ Easy to add new scripts (just config, no code)
@@ -46,34 +28,10 @@
 
 ### Option 1: Test V2 (Recommended)
 
-```bash
-# Install FastAPI if needed
-pip install fastapi uvicorn
-
-# Run new interface
-python -m hypemage.interface_v2
-
-# Test in browser
-http://localhost:8080
-```
-
-### Option 2: Keep V1 for Now
+## Usage
 
 ```bash
-# Continue using current interface
-python -m hypemage.interface
-
-# Migrate when ready
-```
-
----
-
-## Adding Your Own Scripts (V2)
-
-**Super easy - just add config:**
-
-```python
-# In interface_v2.py
+# Start the interface server on the robot
 self.scripts = {
     # Existing scripts...
     
@@ -187,13 +145,15 @@ Pi Boots → Systemd → python -m hypemage.scylla
 
 ```bash
 # Try the new interface
-python -m hypemage.interface_v2
+python -m hypemage.interface
 
-# Open browser
-http://localhost:8080
-
-# Test commands via WebSocket
-# See docs/INTERFACE_COMPARISON.md for API examples
+# Then open browser to robot's IP
+http://robot-ip:8080
 ```
 
-**Everything is ready to test!** Let me know if you want to migrate or have questions.
+## Adding Custom Scripts
+
+Simply add to the `scripts` dictionary in `interface.py`:
+
+```python
+# In interface.py

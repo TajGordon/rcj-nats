@@ -231,38 +231,86 @@ createApp({
         },
         
         initDragAndDrop() {
-            // Enable drag and drop for widgets in single view
+            // Professional drag-and-drop system with animations and ghost preview
             this.$nextTick(() => {
-                let draggedElement = null;
+                let dragState = {
+                    element: null,
+                    clone: null,
+                    placeholder: null,
+                    startX: 0,
+                    startY: 0,
+                    offsetX: 0,
+                    offsetY: 0,
+                    container: null,
+                    isDragging: false
+                };
                 
                 document.addEventListener('mousedown', (e) => {
                     const widget = e.target.closest('.widget');
                     if (!widget || !widget.closest('.single-view')) return;
                     
-                    // Don't drag if clicking on buttons or interactive elements
+                    // Don't drag if clicking on interactive elements or resize handle
                     if (e.target.closest('button, input, img, .logs-container')) return;
                     
-                    draggedElement = widget;
-                    widget.classList.add('dragging');
+                    // Don't drag if clicking on resize corner (bottom-right 30px area)
+                    const rect = widget.getBoundingClientRect();
+                    const isResizeCorner = (
+                        e.clientX > rect.right - 30 && 
+                        e.clientY > rect.bottom - 30 &&
+                        widget.classList.contains('widget-resizable')
+                    );
+                    if (isResizeCorner) return;
+                    
+                    // Initialize drag state
+                    dragState.element = widget;
+                    dragState.container = widget.closest('.widgets-container');
+                    dragState.startX = e.clientX;
+                    dragState.startY = e.clientY;
+                    
+                    const widgetRect = widget.getBoundingClientRect();
+                    dragState.offsetX = e.clientX - widgetRect.left;
+                    dragState.offsetY = e.clientY - widgetRect.top;
+                    
+                    // Add initial grab state (not yet dragging)
+                    widget.classList.add('grab-active');
                     
                     const moveHandler = (e) => {
-                        if (!draggedElement) return;
+                        if (!dragState.element) return;
                         
-                        const container = draggedElement.closest('.widgets-container');
-                        const afterElement = getDragAfterElement(container, e.clientY);
+                        const deltaX = Math.abs(e.clientX - dragState.startX);
+                        const deltaY = Math.abs(e.clientY - dragState.startY);
                         
-                        if (afterElement == null) {
-                            container.appendChild(draggedElement);
-                        } else {
-                            container.insertBefore(draggedElement, afterElement);
+                        // Start dragging after 5px movement (prevents accidental drags)
+                        if (!dragState.isDragging && (deltaX > 5 || deltaY > 5)) {
+                            startDragging(dragState, e);
+                        }
+                        
+                        if (dragState.isDragging) {
+                            updateDragPosition(dragState, e);
+                            updatePlaceholderPosition(dragState, e);
                         }
                     };
                     
                     const upHandler = () => {
-                        if (draggedElement) {
-                            draggedElement.classList.remove('dragging');
-                            draggedElement = null;
+                        if (dragState.isDragging) {
+                            finishDragging(dragState);
+                        } else if (dragState.element) {
+                            dragState.element.classList.remove('grab-active');
                         }
+                        
+                        // Reset state
+                        dragState = {
+                            element: null,
+                            clone: null,
+                            placeholder: null,
+                            startX: 0,
+                            startY: 0,
+                            offsetX: 0,
+                            offsetY: 0,
+                            container: null,
+                            isDragging: false
+                        };
+                        
                         document.removeEventListener('mousemove', moveHandler);
                         document.removeEventListener('mouseup', upHandler);
                     };
@@ -271,19 +319,102 @@ createApp({
                     document.addEventListener('mouseup', upHandler);
                 });
                 
-                function getDragAfterElement(container, y) {
-                    const draggableElements = [...container.querySelectorAll('.widget:not(.dragging)')];
+                function startDragging(state, e) {
+                    state.isDragging = true;
+                    const widget = state.element;
                     
-                    return draggableElements.reduce((closest, child) => {
-                        const box = child.getBoundingClientRect();
-                        const offset = y - box.top - box.height / 2;
+                    // Create floating clone
+                    const clone = widget.cloneNode(true);
+                    clone.classList.add('widget-dragging-clone');
+                    clone.classList.remove('grab-active');
+                    const rect = widget.getBoundingClientRect();
+                    clone.style.width = rect.width + 'px';
+                    clone.style.height = rect.height + 'px';
+                    clone.style.left = (e.clientX - state.offsetX) + 'px';
+                    clone.style.top = (e.clientY - state.offsetY) + 'px';
+                    document.body.appendChild(clone);
+                    state.clone = clone;
+                    
+                    // Create placeholder (ghost outline showing drop position)
+                    const placeholder = document.createElement('div');
+                    placeholder.classList.add('widget-placeholder');
+                    placeholder.style.height = rect.height + 'px';
+                    widget.parentNode.insertBefore(placeholder, widget);
+                    state.placeholder = placeholder;
+                    
+                    // Hide original widget (it's now represented by clone + placeholder)
+                    widget.classList.add('widget-dragging-original');
+                    widget.style.display = 'none';
+                }
+                
+                function updateDragPosition(state, e) {
+                    if (!state.clone) return;
+                    state.clone.style.left = (e.clientX - state.offsetX) + 'px';
+                    state.clone.style.top = (e.clientY - state.offsetY) + 'px';
+                }
+                
+                function updatePlaceholderPosition(state, e) {
+                    if (!state.placeholder || !state.container) return;
+                    
+                    // Find the best insertion point based on cursor position
+                    const widgets = [...state.container.querySelectorAll('.widget:not(.widget-dragging-original)')];
+                    let insertBefore = null;
+                    let minDistance = Infinity;
+                    
+                    widgets.forEach(widget => {
+                        const rect = widget.getBoundingClientRect();
+                        const widgetCenterY = rect.top + rect.height / 2;
+                        const distance = Math.abs(e.clientY - widgetCenterY);
                         
-                        if (offset < 0 && offset > closest.offset) {
-                            return { offset: offset, element: child };
-                        } else {
-                            return closest;
+                        // If cursor is above this widget's center, consider inserting before it
+                        if (e.clientY < widgetCenterY && distance < minDistance) {
+                            minDistance = distance;
+                            insertBefore = widget;
                         }
-                    }, { offset: Number.NEGATIVE_INFINITY }).element;
+                    });
+                    
+                    // Move placeholder to the calculated position
+                    if (insertBefore && insertBefore !== state.placeholder) {
+                        state.container.insertBefore(state.placeholder, insertBefore);
+                    } else if (!insertBefore && state.container.lastElementChild !== state.placeholder) {
+                        // Insert at the end if cursor is below all widgets
+                        state.container.appendChild(state.placeholder);
+                    }
+                }
+                
+                function finishDragging(state) {
+                    if (!state.element || !state.placeholder) return;
+                    
+                    // Remove clone with fade animation
+                    if (state.clone) {
+                        state.clone.classList.add('widget-dropping');
+                        setTimeout(() => {
+                            if (state.clone && state.clone.parentNode) {
+                                state.clone.parentNode.removeChild(state.clone);
+                            }
+                        }, 200);
+                    }
+                    
+                    // Move original element to placeholder position
+                    const placeholder = state.placeholder;
+                    placeholder.parentNode.insertBefore(state.element, placeholder);
+                    
+                    // Show original element again with pop-in animation
+                    state.element.style.display = '';
+                    state.element.classList.remove('widget-dragging-original', 'grab-active');
+                    state.element.classList.add('widget-dropped');
+                    
+                    // Remove animations after they complete
+                    setTimeout(() => {
+                        if (state.element) {
+                            state.element.classList.remove('widget-dropped');
+                        }
+                    }, 300);
+                    
+                    // Remove placeholder
+                    if (placeholder.parentNode) {
+                        placeholder.parentNode.removeChild(placeholder);
+                    }
                 }
             });
         }

@@ -21,8 +21,8 @@ Edit `app.js` and update the robot IPs:
 
 ```javascript
 const ROBOT_CONFIG = {
-    storm: { name: 'Storm', host: 'storm.local', interfacePort: 8080, debugPort: 8765 },
-    necron: { name: 'Necron', host: 'necron.local', interfacePort: 8080, debugPort: 8765 }
+    storm: { name: 'Storm', host: 'f7.local', interfacePort: 8080, debugPort: 8765 },
+    necron: { name: 'Necron', host: 'm7.local', interfacePort: 8080, debugPort: 8765 }
 };
 ```
 

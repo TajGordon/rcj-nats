@@ -28,10 +28,12 @@ Usage:
 
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Tuple
+from pathlib import Path
 import time
 import cv2
 import numpy as np
 import math
+import json
 
 from hypemage.logger import get_logger
 
@@ -99,17 +101,12 @@ class CameraProcess:
         Initialize camera with configuration
         
         Args:
-            config: Optional configuration dict with keys:
-                - camera: width, height, format
-                - ball_detection: HSV ranges, thresholds
-                - goal_detection: blue/yellow goal params
-                - circular_mask: center_x, center_y, radius
-                - frame_config: center_x, center_y
+            config: Optional configuration dict. If None, loads from camera_config.json
                 
         Raises:
             CameraInitializationError: If camera hardware fails to initialize
         """
-        self.config = config or self._default_config()
+        self.config = config or self._load_config()
         
         # Initialize camera
         try:
@@ -141,30 +138,79 @@ class CameraProcess:
             logger.critical(f"CRITICAL: Failed to initialize camera: {e}", exc_info=True)
             raise CameraInitializationError(f"Camera initialization failed: {e}")
         
-        # Extract config parameters
-        ball_cfg = self.config['ball_detection']
-        self.lower_orange = np.array(ball_cfg["lower_orange"])
-        self.upper_orange = np.array(ball_cfg["upper_orange"])
-        self.proximity_threshold = ball_cfg["proximity_threshold"]
-        self.angle_tolerance = ball_cfg["angle_tolerance"]
-        self.min_ball_area = ball_cfg["min_contour_area"]
-        self.max_ball_area = ball_cfg["max_contour_area"]
+        # Extract HSV ranges from config
+        hsv_ranges = self.config.get('hsv_ranges', {})
+        ball_cfg = hsv_ranges.get('ball', {})
+        self.lower_orange = np.array(ball_cfg.get("lower", [10, 100, 100]))
+        self.upper_orange = np.array(ball_cfg.get("upper", [20, 255, 255]))
+        self.min_ball_area = ball_cfg.get("min_area", 100)
+        self.max_ball_area = ball_cfg.get("max_area", 50000)
         
-        mask_cfg = self.config['circular_mask']
-        self.mask_center_x = mask_cfg["center_x"]
-        self.mask_center_y = mask_cfg["center_y"]
-        self.mask_radius = mask_cfg["radius"]
+        blue_goal_cfg = hsv_ranges.get('blue_goal', {})
+        self.lower_blue = np.array(blue_goal_cfg.get("lower", [100, 150, 50]))
+        self.upper_blue = np.array(blue_goal_cfg.get("upper", [120, 255, 255]))
+        self.min_blue_area = blue_goal_cfg.get("min_area", 500)
+        self.max_blue_area = blue_goal_cfg.get("max_area", 100000)
         
-        frame_cfg = self.config['frame_config']
-        self.frame_center_x = frame_cfg["center_x"]
-        self.frame_center_y = frame_cfg["center_y"]
+        yellow_goal_cfg = hsv_ranges.get('yellow_goal', {})
+        self.lower_yellow = np.array(yellow_goal_cfg.get("lower", [20, 100, 100]))
+        self.upper_yellow = np.array(yellow_goal_cfg.get("upper", [40, 255, 255]))
+        self.min_yellow_area = yellow_goal_cfg.get("min_area", 500)
+        self.max_yellow_area = yellow_goal_cfg.get("max_area", 100000)
         
-        self.blue_goal_config = self.config['goal_detection']["blue_goal"]
-        self.yellow_goal_config = self.config['goal_detection']["yellow_goal"]
-        self.goal_detection_params = self.config['goal_detection']
+        # Detection parameters
+        detection_cfg = self.config.get('detection', {})
+        self.proximity_threshold = detection_cfg.get("proximity_threshold", 5000)
+        self.angle_tolerance = detection_cfg.get("angle_tolerance", 15)
+        
+        # Frame center
+        cam_cfg = self.config['camera']
+        self.frame_center_x = cam_cfg["width"] // 2
+        self.frame_center_y = cam_cfg["height"] // 2
+        
+        # Goal detection configs (kept for compatibility with existing detection methods)
+        self.blue_goal_config = {
+            'lower': self.lower_blue.tolist(),
+            'upper': self.upper_blue.tolist(),
+            'min_contour_area': self.min_blue_area,
+            'max_contour_area': self.max_blue_area
+        }
+        self.yellow_goal_config = {
+            'lower': self.lower_yellow.tolist(),
+            'upper': self.upper_yellow.tolist(),
+            'min_contour_area': self.min_yellow_area,
+            'max_contour_area': self.max_yellow_area
+        }
+        self.goal_detection_params = {
+            'min_goal_width': 20,
+            'min_goal_height': 20,
+            'goal_center_tolerance': detection_cfg.get("goal_center_tolerance", 0.15)
+        }
+        
+        # Circular mask (for field boundary)
+        self.mask_center_x = cam_cfg["width"] // 2
+        self.mask_center_y = cam_cfg["height"] // 2
+        self.mask_radius = 80  # Default radius for field mask
         
         # Frame counter for frame IDs
         self.frame_counter = 0
+    
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from camera_config.json"""
+        config_path = Path(__file__).parent / "camera_config.json"
+        
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                logger.info(f"Loaded camera config from {config_path}")
+                return config
+            except Exception as e:
+                logger.warning(f"Failed to load config from {config_path}: {e}")
+                return self._default_config()
+        else:
+            logger.warning(f"Config file not found: {config_path}, using defaults")
+            return self._default_config()
     
     def _default_config(self) -> Dict[str, Any]:
         """Return default configuration if none provided"""
@@ -174,42 +220,29 @@ class CameraProcess:
                 'height': 480,
                 'format': 'RGB888'
             },
-            'ball_detection': {
-                'lower_orange': [5, 150, 150],
-                'upper_orange': [15, 255, 255],
-                'proximity_threshold': 5000,
-                'angle_tolerance': 0.1,
-                'min_contour_area': 100,
-                'max_contour_area': 50000
-            },
-            'circular_mask': {
-                'center_x': 320,
-                'center_y': 240,
-                'radius': 80
-            },
-            'frame_config': {
-                'center_x': 320,
-                'center_y': 240
-            },
-            'goal_detection': {
+            'hsv_ranges': {
+                'ball': {
+                    'lower': [10, 100, 100],
+                    'upper': [20, 255, 255],
+                    'min_area': 100,
+                    'max_area': 50000
+                },
                 'blue_goal': {
-                    'lower': [100, 150, 0],
-                    'upper': [130, 255, 255],
-                    'min_contour_area': 500,
-                    'max_contour_area': 100000,
-                    'aspect_ratio_min': 0.3,
-                    'aspect_ratio_max': 3.0
+                    'lower': [100, 150, 50],
+                    'upper': [120, 255, 255],
+                    'min_area': 500,
+                    'max_area': 100000
                 },
                 'yellow_goal': {
                     'lower': [20, 100, 100],
-                    'upper': [30, 255, 255],
-                    'min_contour_area': 500,
-                    'max_contour_area': 100000,
-                    'aspect_ratio_min': 0.3,
-                    'aspect_ratio_max': 3.0
-                },
-                'min_goal_width': 20,
-                'min_goal_height': 20,
+                    'upper': [40, 255, 255],
+                    'min_area': 500,
+                    'max_area': 100000
+                }
+            },
+            'detection': {
+                'proximity_threshold': 5000,
+                'angle_tolerance': 15,
                 'goal_center_tolerance': 0.15
             }
         }
@@ -371,6 +404,35 @@ class CameraProcess:
             self.cap.release()
 
 
+def load_camera_config(config_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Load camera configuration from JSON file (standalone function for scripts)
+    
+    Args:
+        config_path: Path to config file. If None, uses default location.
+        
+    Returns:
+        Dict containing camera configuration
+    """
+    if config_path is None:
+        path = Path(__file__).parent / "camera_config.json"
+    else:
+        path = Path(config_path)
+    
+    if path.exists():
+        try:
+            with open(path, 'r') as f:
+                config = json.load(f)
+            logger.info(f"Loaded camera config from {path}")
+            return config
+        except Exception as e:
+            logger.warning(f"Failed to load config from {path}: {e}")
+            return {}
+    else:
+        logger.warning(f"Config file not found: {path}")
+        return {}
+
+
 def camera_start(cmd_q, out_q, stop_evt, config=None):
     """
     Entry point for camera process - runs continuously and processes commands
@@ -495,6 +557,103 @@ def start(cmd_q, out_q, stop_evt=None, config=None):
         stop_evt = Event()
     
     camera_start(cmd_q, out_q, stop_evt, config)
+
+
+def add_debug_overlays(frame: np.ndarray, vision_data: VisionData) -> np.ndarray:
+    """
+    Add debug overlays to frame showing detection results
+    
+    Args:
+        frame: RGB frame from camera
+        vision_data: Detection results to visualize
+        
+    Returns:
+        Frame with overlays drawn (BGR for display)
+    """
+    # Convert RGB to BGR for OpenCV drawing
+    display_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    
+    # Draw ball detection
+    if vision_data.ball.detected:
+        center = (vision_data.ball.center_x, vision_data.ball.center_y)
+        radius = vision_data.ball.radius
+        
+        # Draw circle around ball
+        cv2.circle(display_frame, center, radius, (0, 165, 255), 3)  # Orange circle
+        cv2.circle(display_frame, center, 5, (0, 0, 255), -1)  # Red center dot
+        
+        # Add label with position and radius
+        label = f"Ball: ({vision_data.ball.center_x}, {vision_data.ball.center_y}) r={radius}"
+        cv2.putText(display_frame, label, (center[0] - 80, center[1] - radius - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+    
+    # Draw blue goal detection
+    if vision_data.blue_goal.detected:
+        x = vision_data.blue_goal.center_x - vision_data.blue_goal.width // 2
+        y = vision_data.blue_goal.center_y - vision_data.blue_goal.height // 2
+        w = vision_data.blue_goal.width
+        h = vision_data.blue_goal.height
+        
+        # Draw rectangle around blue goal
+        cv2.rectangle(display_frame, (x, y), (x + w, y + h), (255, 0, 0), 3)  # Blue box
+        
+        # Add label
+        label = f"Blue: ({vision_data.blue_goal.center_x}, {vision_data.blue_goal.center_y})"
+        cv2.putText(display_frame, label, (x, y - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+    
+    # Draw yellow goal detection
+    if vision_data.yellow_goal.detected:
+        x = vision_data.yellow_goal.center_x - vision_data.yellow_goal.width // 2
+        y = vision_data.yellow_goal.center_y - vision_data.yellow_goal.height // 2
+        w = vision_data.yellow_goal.width
+        h = vision_data.yellow_goal.height
+        
+        # Draw rectangle around yellow goal
+        cv2.rectangle(display_frame, (x, y), (x + w, y + h), (0, 255, 255), 3)  # Yellow box
+        
+        # Add label
+        label = f"Yellow: ({vision_data.yellow_goal.center_x}, {vision_data.yellow_goal.center_y})"
+        cv2.putText(display_frame, label, (x, y - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+    
+    # Add FPS counter if available
+    fps_label = f"FPS: {int(1000.0 / (vision_data.timestamp * 1000 + 1))}"
+    cv2.putText(display_frame, fps_label, (10, 30),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    
+    return display_frame
+
+
+def create_mask_preview(frame: np.ndarray, lower_hsv: np.ndarray, upper_hsv: np.ndarray, 
+                       label: str = "") -> np.ndarray:
+    """
+    Create a mask preview showing what the HSV range captures
+    
+    Args:
+        frame: RGB frame from camera
+        lower_hsv: Lower HSV bounds [H, S, V]
+        upper_hsv: Upper HSV bounds [H, S, V]
+        label: Optional label to add to preview
+        
+    Returns:
+        BGR image showing the mask (white = detected, black = not detected)
+    """
+    # Convert to HSV
+    hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+    
+    # Create mask
+    mask = cv2.inRange(hsv, lower_hsv, upper_hsv)
+    
+    # Convert mask to BGR for display (easier to see)
+    mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+    
+    # Add label if provided
+    if label:
+        cv2.putText(mask_bgr, label, (10, 30),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    
+    return mask_bgr
 
 
 if __name__ == '__main__':

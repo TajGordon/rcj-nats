@@ -19,7 +19,7 @@ import sys
 
 from hypemage.logger import get_logger
 from hypemage.motor_control import MotorController, MotorInitializationError
-from hypemage.camera_conversion import CameraProcess, CameraInitializationError
+from hypemage.camera import CameraProcess, CameraInitializationError
 
 logger = get_logger(__name__)
 
@@ -283,7 +283,7 @@ class Scylla:
     
     def _start_camera_process(self):
         """Start the camera process"""
-        from hypemage.camera_conversion import start as camera_start
+        from hypemage.camera import start as camera_start
         
         proc = self.ctx.Process(
             target=camera_start,

@@ -27,6 +27,7 @@
   },
   "detection": {
     "proximity_threshold": 5000,
-    "angle_tolerance": 15
+    "angle_tolerance": 15,
+    "goal_center_tolerance": 0.15
   }
 }

@@ -617,9 +617,9 @@ def add_debug_overlays(frame: np.ndarray, vision_data: VisionData) -> np.ndarray
         cv2.putText(display_frame, label, (x, y - 10),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
     
-    # Add FPS counter if available
-    fps_label = f"FPS: {int(1000.0 / (vision_data.timestamp * 1000 + 1))}"
-    cv2.putText(display_frame, fps_label, (10, 30),
+    # Add frame ID
+    frame_label = f"Frame: {vision_data.frame_id}"
+    cv2.putText(display_frame, frame_label, (10, 30),
                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
     
     return display_frame

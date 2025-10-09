@@ -14,6 +14,7 @@ const ROBOT_CONFIG = {
 const AVAILABLE_WIDGETS = [
     { id: 'controls', name: 'Controls', icon: '🎮', resizable: false },
     { id: 'camera', name: 'Camera', icon: '📷', resizable: true },
+    { id: 'calibration', name: 'Calibration', icon: '🎨', resizable: false },
     { id: 'motors', name: 'Motors', icon: '⚙️', resizable: false },
     { id: 'logs', name: 'Logs', icon: '📝', resizable: true },
     { id: 'status', name: 'Status', icon: 'ℹ️', resizable: false }
@@ -56,6 +57,15 @@ createApp({
                 motors: { 
                     speeds: { front_left: 0, front_right: 0, back_left: 0, back_right: 0, dribbler: 0 },
                     temps: { front_left: 0, front_right: 0, back_left: 0, back_right: 0, dribbler: 0 }
+                },
+                calibration: {
+                    original: null,
+                    ball_mask: null,
+                    blue_mask: null,
+                    yellow_mask: null,
+                    ball: { lower: [10, 100, 100], upper: [20, 255, 255] },
+                    blue_goal: { lower: [100, 150, 50], upper: [120, 255, 255] },
+                    yellow_goal: { lower: [20, 100, 100], upper: [40, 255, 255] }
                 },
                 logs: [],
                 visibleWidgets: new Set(['controls', 'camera', 'motors', 'logs', 'status'])
@@ -190,6 +200,35 @@ createApp({
             if (subsystem === 'camera' && payload.frame_jpeg) {
                 robot.camera.fps = payload.fps || 0;
                 robot.camera.frame = `data:image/jpeg;base64,${payload.frame_jpeg}`;
+            } else if (subsystem === 'camera_debug' && payload) {
+                // Camera debug frame with overlays (base64 encoded)
+                robot.camera.frame = `data:image/jpeg;base64,${payload}`;
+            } else if (subsystem === 'camera_calibrate' && payload) {
+                // Camera calibration data - original frame + 3 masks
+                if (payload.original) {
+                    robot.calibration.original = `data:image/jpeg;base64,${payload.original}`;
+                }
+                if (payload.ball_mask) {
+                    robot.calibration.ball_mask = `data:image/jpeg;base64,${payload.ball_mask}`;
+                }
+                if (payload.blue_mask) {
+                    robot.calibration.blue_mask = `data:image/jpeg;base64,${payload.blue_mask}`;
+                }
+                if (payload.yellow_mask) {
+                    robot.calibration.yellow_mask = `data:image/jpeg;base64,${payload.yellow_mask}`;
+                }
+                // Update HSV ranges if provided
+                if (payload.hsv_ranges) {
+                    if (payload.hsv_ranges.ball) {
+                        robot.calibration.ball = payload.hsv_ranges.ball;
+                    }
+                    if (payload.hsv_ranges.blue_goal) {
+                        robot.calibration.blue_goal = payload.hsv_ranges.blue_goal;
+                    }
+                    if (payload.hsv_ranges.yellow_goal) {
+                        robot.calibration.yellow_goal = payload.hsv_ranges.yellow_goal;
+                    }
+                }
             } else if (subsystem === 'motors') {
                 // Handle both array and object formats from debug manager
                 if (Array.isArray(payload.speeds)) {
@@ -527,6 +566,49 @@ createApp({
             if (index !== -1) {
                 this.notifications.splice(index, 1);
             }
+        },
+        
+        updateHSV(robotName, target) {
+            const robot = this[robotName];
+            
+            if (!robot.debugWs || robot.debugWs.readyState !== WebSocket.OPEN) {
+                console.warn(`[${robot.name}] Debug WebSocket not connected, cannot send HSV update`);
+                return;
+            }
+            
+            // Send HSV update to debug manager
+            const message = {
+                command: 'update_hsv',
+                target: target,
+                lower: robot.calibration[target].lower,
+                upper: robot.calibration[target].upper
+            };
+            
+            robot.debugWs.send(JSON.stringify(message));
+            console.log(`[${robot.name}] Sent HSV update for ${target}:`, message);
+        },
+        
+        saveCalibration(robotName) {
+            const robot = this[robotName];
+            
+            if (!robot.debugWs || robot.debugWs.readyState !== WebSocket.OPEN) {
+                this.showNotification(`${robot.name}: Not connected to debug server`, 'error');
+                return;
+            }
+            
+            // Send save command to debug manager
+            const message = {
+                command: 'save_calibration',
+                hsv_ranges: {
+                    ball: robot.calibration.ball,
+                    blue_goal: robot.calibration.blue_goal,
+                    yellow_goal: robot.calibration.yellow_goal
+                }
+            };
+            
+            robot.debugWs.send(JSON.stringify(message));
+            this.showNotification(`${robot.name}: Calibration saved`, 'success');
+            console.log(`[${robot.name}] Saved calibration:`, message);
         }
     }
 }).mount('#app');

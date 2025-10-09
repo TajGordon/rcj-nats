@@ -74,6 +74,149 @@
                             <div v-else class="no-feed">No camera feed</div>
                         </div>
                         
+                        <!-- Camera Calibration -->
+                        <div v-if="storm.visibleWidgets.has('calibration')" class="widget widget-wide calibration-widget">
+                            <h3>🎨 HSV Calibration</h3>
+                            <div class="calibration-container">
+                                <!-- Preview Images -->
+                                <div class="calibration-previews">
+                                    <div class="preview-item">
+                                        <div class="preview-label">Original</div>
+                                        <img v-if="storm.calibration.original" :src="storm.calibration.original" alt="Original">
+                                        <div v-else class="no-feed">No feed</div>
+                                    </div>
+                                    <div class="preview-item">
+                                        <div class="preview-label">Ball Mask</div>
+                                        <img v-if="storm.calibration.ball_mask" :src="storm.calibration.ball_mask" alt="Ball mask">
+                                        <div v-else class="no-feed">No mask</div>
+                                    </div>
+                                    <div class="preview-item">
+                                        <div class="preview-label">Blue Goal Mask</div>
+                                        <img v-if="storm.calibration.blue_mask" :src="storm.calibration.blue_mask" alt="Blue goal mask">
+                                        <div v-else class="no-feed">No mask</div>
+                                    </div>
+                                    <div class="preview-item">
+                                        <div class="preview-label">Yellow Goal Mask</div>
+                                        <img v-if="storm.calibration.yellow_mask" :src="storm.calibration.yellow_mask" alt="Yellow goal mask">
+                                        <div v-else class="no-feed">No mask</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- HSV Sliders -->
+                                <div class="calibration-sliders">
+                                    <!-- Ball HSV -->
+                                    <div class="slider-group">
+                                        <h4>🏀 Ball HSV Range</h4>
+                                        <div class="slider-row">
+                                            <label>H Min (0-180):</label>
+                                            <input type="range" min="0" max="180" v-model.number="storm.calibration.ball.lower[0]" @input="updateHSV('storm', 'ball')">
+                                            <span>{{ storm.calibration.ball.lower[0] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>S Min (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.ball.lower[1]" @input="updateHSV('storm', 'ball')">
+                                            <span>{{ storm.calibration.ball.lower[1] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>V Min (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.ball.lower[2]" @input="updateHSV('storm', 'ball')">
+                                            <span>{{ storm.calibration.ball.lower[2] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>H Max (0-180):</label>
+                                            <input type="range" min="0" max="180" v-model.number="storm.calibration.ball.upper[0]" @input="updateHSV('storm', 'ball')">
+                                            <span>{{ storm.calibration.ball.upper[0] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>S Max (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.ball.upper[1]" @input="updateHSV('storm', 'ball')">
+                                            <span>{{ storm.calibration.ball.upper[1] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>V Max (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.ball.upper[2]" @input="updateHSV('storm', 'ball')">
+                                            <span>{{ storm.calibration.ball.upper[2] }}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Blue Goal HSV -->
+                                    <div class="slider-group">
+                                        <h4>🔵 Blue Goal HSV Range</h4>
+                                        <div class="slider-row">
+                                            <label>H Min (0-180):</label>
+                                            <input type="range" min="0" max="180" v-model.number="storm.calibration.blue_goal.lower[0]" @input="updateHSV('storm', 'blue_goal')">
+                                            <span>{{ storm.calibration.blue_goal.lower[0] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>S Min (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.blue_goal.lower[1]" @input="updateHSV('storm', 'blue_goal')">
+                                            <span>{{ storm.calibration.blue_goal.lower[1] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>V Min (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.blue_goal.lower[2]" @input="updateHSV('storm', 'blue_goal')">
+                                            <span>{{ storm.calibration.blue_goal.lower[2] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>H Max (0-180):</label>
+                                            <input type="range" min="0" max="180" v-model.number="storm.calibration.blue_goal.upper[0]" @input="updateHSV('storm', 'blue_goal')">
+                                            <span>{{ storm.calibration.blue_goal.upper[0] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>S Max (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.blue_goal.upper[1]" @input="updateHSV('storm', 'blue_goal')">
+                                            <span>{{ storm.calibration.blue_goal.upper[1] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>V Max (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.blue_goal.upper[2]" @input="updateHSV('storm', 'blue_goal')">
+                                            <span>{{ storm.calibration.blue_goal.upper[2] }}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Yellow Goal HSV -->
+                                    <div class="slider-group">
+                                        <h4>🟡 Yellow Goal HSV Range</h4>
+                                        <div class="slider-row">
+                                            <label>H Min (0-180):</label>
+                                            <input type="range" min="0" max="180" v-model.number="storm.calibration.yellow_goal.lower[0]" @input="updateHSV('storm', 'yellow_goal')">
+                                            <span>{{ storm.calibration.yellow_goal.lower[0] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>S Min (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.yellow_goal.lower[1]" @input="updateHSV('storm', 'yellow_goal')">
+                                            <span>{{ storm.calibration.yellow_goal.lower[1] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>V Min (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.yellow_goal.lower[2]" @input="updateHSV('storm', 'yellow_goal')">
+                                            <span>{{ storm.calibration.yellow_goal.lower[2] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>H Max (0-180):</label>
+                                            <input type="range" min="0" max="180" v-model.number="storm.calibration.yellow_goal.upper[0]" @input="updateHSV('storm', 'yellow_goal')">
+                                            <span>{{ storm.calibration.yellow_goal.upper[0] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>S Max (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.yellow_goal.upper[1]" @input="updateHSV('storm', 'yellow_goal')">
+                                            <span>{{ storm.calibration.yellow_goal.upper[1] }}</span>
+                                        </div>
+                                        <div class="slider-row">
+                                            <label>V Max (0-255):</label>
+                                            <input type="range" min="0" max="255" v-model.number="storm.calibration.yellow_goal.upper[2]" @input="updateHSV('storm', 'yellow_goal')">
+                                            <span>{{ storm.calibration.yellow_goal.upper[2] }}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Save Button -->
+                                    <div class="calibration-actions">
+                                        <button @click="saveCalibration('storm')" class="btn btn-success">💾 Save Calibration</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Motors -->
                         <div v-if="storm.visibleWidgets.has('motors')" class="widget">
                             <h3>⚙️ Motors</h3>

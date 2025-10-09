@@ -108,6 +108,22 @@ body {
     gap: 1.5rem;
 }
 
+.widgets-container.expanded {
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+}
+
+/* Resizable widgets in single view */
+.single-view .widget-resizable {
+    grid-column: span 2;
+    min-height: 400px;
+}
+
+@media (max-width: 1200px) {
+    .single-view .widget-resizable {
+        grid-column: span 1;
+    }
+}
+
 .widget {
     background: var(--bg-panel);
     border: 2px solid transparent;
@@ -200,6 +216,8 @@ body {
 .motor-label {
     font-weight: 600;
     color: var(--accent-blue);
+    text-transform: capitalize;
+    min-width: 100px;
 }
 
 .motor-bar {
@@ -218,6 +236,58 @@ body {
     font-weight: 600;
     min-width: 50px;
     text-align: right;
+}
+
+/* Logs Widget */
+.logs-widget .logs-container {
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+}
+
+.single-view .logs-widget .logs-container {
+    max-height: 500px;
+}
+
+.logs-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.logs-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.logs-container::-webkit-scrollbar-thumb {
+    background: var(--accent-blue);
+    border-radius: 4px;
+}
+
+.logs-container::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-purple);
+}
+
+.no-logs {
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 2rem;
+    font-style: italic;
+}
+
+.log-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.log-entry {
+    color: var(--text-secondary);
+    line-height: 1.5;
+    word-wrap: break-word;
 }
 
 .footer {
@@ -254,16 +324,42 @@ body {
 
 .widget-toggles {
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
     align-items: center;
     flex-wrap: wrap;
 }
 
-.toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+.toggle-label {
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.toggle-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid var(--danger);
+    background: rgba(255, 68, 68, 0.1);
+    color: var(--danger);
+    border-radius: 8px;
     cursor: pointer;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.toggle-btn:hover {
+    background: rgba(255, 68, 68, 0.2);
+    transform: translateY(-1px);
+}
+
+.toggle-btn.active {
+    border-color: var(--success);
+    background: rgba(0, 255, 136, 0.15);
+    color: var(--success);
+}
+
+.toggle-btn.active:hover {
+    background: rgba(0, 255, 136, 0.25);
 }
 
 @media (max-width: 1200px) {

@@ -12,11 +12,14 @@ const ROBOT_CONFIG = {
 };
 
 const AVAILABLE_WIDGETS = [
-    { id: 'controls', name: 'Controls', icon: '🎮' },
-    { id: 'camera', name: 'Camera', icon: '📷' },
-    { id: 'motors', name: 'Motors', icon: '⚙️' },
-    { id: 'status', name: 'Status', icon: 'ℹ️' }
+    { id: 'controls', name: 'Controls', icon: '🎮', resizable: false },
+    { id: 'camera', name: 'Camera', icon: '📷', resizable: true },
+    { id: 'motors', name: 'Motors', icon: '⚙️', resizable: false },
+    { id: 'logs', name: 'Logs', icon: '📝', resizable: true },
+    { id: 'status', name: 'Status', icon: 'ℹ️', resizable: false }
 ];
+
+const MOTOR_NAMES = ['front_left', 'front_right', 'back_left', 'back_right', 'dribbler'];
 
 createApp({
     data() {
@@ -45,9 +48,12 @@ createApp({
                 pid: null,
                 debugEnabled: false,
                 camera: { fps: 0, frame: null },
-                motors: { speeds: [0, 0, 0, 0], temps: [0, 0, 0, 0] },
+                motors: { 
+                    speeds: { front_left: 0, front_right: 0, back_left: 0, back_right: 0, dribbler: 0 },
+                    temps: { front_left: 0, front_right: 0, back_left: 0, back_right: 0, dribbler: 0 }
+                },
                 logs: [],
-                visibleWidgets: new Set(['controls', 'camera', 'motors', 'status'])
+                visibleWidgets: new Set(['controls', 'camera', 'motors', 'logs', 'status'])
             };
         },
         
@@ -151,8 +157,25 @@ createApp({
                         robot.camera.frame = `data:image/jpeg;base64,${payload.frame_jpeg}`;
                     }
                 } else if (subsystem === 'motors') {
-                    robot.motors.speeds = payload.speeds || [0, 0, 0, 0];
-                    robot.motors.temps = payload.temps || [0, 0, 0, 0];
+                    // Handle both array and object formats
+                    if (Array.isArray(payload.speeds)) {
+                        MOTOR_NAMES.forEach((name, i) => {
+                            robot.motors.speeds[name] = payload.speeds[i] || 0;
+                            robot.motors.temps[name] = (payload.temps && payload.temps[i]) || 0;
+                        });
+                    } else {
+                        robot.motors.speeds = payload.speeds || robot.motors.speeds;
+                        robot.motors.temps = payload.temps || robot.motors.temps;
+                    }
+                } else if (subsystem === 'logs') {
+                    // Add new log entries
+                    if (payload.logs && Array.isArray(payload.logs)) {
+                        robot.logs.push(...payload.logs);
+                        // Keep only last 100 logs
+                        if (robot.logs.length > 100) {
+                            robot.logs = robot.logs.slice(-100);
+                        }
+                    }
                 }
             }
         },

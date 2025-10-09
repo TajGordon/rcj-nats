@@ -13,14 +13,39 @@
         <header class="header">
             <h1>🤖 Multi-Robot Dashboard</h1>
             <div class="connection-badges">
-                <span :class="['badge', storm.connected ? 'connected' : 'disconnected']">
+                <span 
+                    @click="manualReconnect('storm')" 
+                    :class="['badge', 'badge-clickable', storm.connected ? 'connected' : 'disconnected']"
+                    title="Click to reconnect">
                     Storm {{ storm.connected ? '✓' : '✗' }}
                 </span>
-                <span :class="['badge', necron.connected ? 'connected' : 'disconnected']">
+                <span 
+                    @click="manualReconnect('necron')" 
+                    :class="['badge', 'badge-clickable', necron.connected ? 'connected' : 'disconnected']"
+                    title="Click to reconnect">
                     Necron {{ necron.connected ? '✓' : '✗' }}
                 </span>
             </div>
         </header>
+        
+        <!-- Notifications -->
+        <div class="notifications-container">
+            <transition-group name="notification">
+                <div 
+                    v-for="notif in notifications" 
+                    :key="notif.id" 
+                    :class="['notification', `notification-${notif.type}`]"
+                    @click="dismissNotification(notif.id)">
+                    <span class="notification-icon">
+                        <span v-if="notif.type === 'success'">✓</span>
+                        <span v-else-if="notif.type === 'error'">✗</span>
+                        <span v-else>ℹ</span>
+                    </span>
+                    <span class="notification-message">{{ notif.message }}</span>
+                    <span class="notification-close">×</span>
+                </div>
+            </transition-group>
+        </div>
 
         <!-- Main Content -->
         <main class="main-content">

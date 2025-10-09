@@ -27,7 +27,8 @@ createApp({
             currentView: 'both',
             availableWidgets: AVAILABLE_WIDGETS,
             storm: this.createRobotState('storm'),
-            necron: this.createRobotState('necron')
+            necron: this.createRobotState('necron'),
+            notifications: []
         };
     },
     
@@ -75,6 +76,7 @@ createApp({
             ws.onopen = () => {
                 console.log(`[${robot.name}] Interface connected`);
                 robot.connected = true;
+                this.showNotification(`${robot.name} connected successfully`, 'success');
             };
             
             ws.onmessage = (event) => {
@@ -84,6 +86,7 @@ createApp({
             
             ws.onerror = (error) => {
                 console.error(`[${robot.name}] Interface error:`, error);
+                this.showNotification(`${robot.name} connection failed`, 'error');
             };
             
             ws.onclose = () => {
@@ -420,6 +423,50 @@ createApp({
                     }
                 }
             });
+        },
+        
+        manualReconnect(robotName) {
+            const robot = this[robotName];
+            this.showNotification(`Attempting to reconnect to ${robot.name}...`, 'info');
+            
+            // Close existing connections
+            if (robot.interfaceWs) {
+                robot.interfaceWs.onclose = null; // Prevent auto-reconnect
+                robot.interfaceWs.close();
+            }
+            if (robot.debugWs) {
+                robot.debugWs.onclose = null;
+                robot.debugWs.close();
+            }
+            
+            // Reset state
+            robot.connected = false;
+            
+            // Attempt new connection
+            setTimeout(() => {
+                this.connectRobot(robotName);
+            }, 100);
+        },
+        
+        showNotification(message, type = 'info') {
+            const id = Date.now();
+            const notification = { id, message, type };
+            this.notifications.push(notification);
+            
+            // Auto-remove after 4 seconds
+            setTimeout(() => {
+                const index = this.notifications.findIndex(n => n.id === id);
+                if (index !== -1) {
+                    this.notifications.splice(index, 1);
+                }
+            }, 4000);
+        },
+        
+        dismissNotification(id) {
+            const index = this.notifications.findIndex(n => n.id === id);
+            if (index !== -1) {
+                this.notifications.splice(index, 1);
+            }
         }
     }
 }).mount('#app');

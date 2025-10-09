@@ -10,18 +10,18 @@ which are received via queue and immediately reflected in the mask previews.
 
 Usage:
     Launch from web interface or run directly:
-    python -m hypemage.scripts.camera_calibrate
+    python -m hypemage.scripts.camera_calibrate [--robot storm|necron]
 """
 
 import time
 import signal
-import json
 import numpy as np
-from pathlib import Path
+import argparse
 from typing import Optional
 
 # Import camera module and mask preview function
-from hypemage.camera import CameraProcess, create_mask_preview, load_camera_config
+from hypemage.camera import CameraProcess, create_mask_preview
+from hypemage.config import load_config, get_robot_id
 from hypemage.logger import get_logger
 
 logger = get_logger("camera_calibrate")
@@ -37,62 +37,29 @@ def signal_handler(signum, frame):
     should_stop = True
 
 
-def save_config(config_data: dict, config_path: Optional[str] = None):
-    """
-    Save updated HSV ranges to camera_config.json
-    
-    Args:
-        config_data: Dict containing hsv_ranges to save
-        config_path: Optional path to config file
-    """
-    if config_path is None:
-        path = Path(__file__).parent.parent / "camera_config.json"
-    else:
-        path = Path(config_path)
-    
-    try:
-        # Load existing config
-        if path.exists():
-            with open(path, 'r') as f:
-                full_config = json.load(f)
-        else:
-            full_config = {}
-        
-        # Update HSV ranges
-        full_config['hsv_ranges'] = config_data['hsv_ranges']
-        
-        # Write back
-        with open(path, 'w') as f:
-            json.dump(full_config, f, indent=2)
-        
-        logger.info(f"Saved calibration to {path}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to save config: {e}", exc_info=True)
-        return False
-
-
-def camera_calibrate_loop(fps_target: int = 10, subsystem_name: str = "camera_calibrate"):
+def camera_calibrate_loop(fps_target: int = 10, subsystem_name: str = "camera_calibrate", robot_id: Optional[str] = None):
     """
     Main calibration loop - captures frames and creates mask previews
     
     Args:
         fps_target: Target frames per second (lower than debug since less critical)
         subsystem_name: Name for debug manager subsystem registration
+        robot_id: Robot identifier ('storm' or 'necron'). If None, auto-detects.
     """
     global should_stop
     
-    logger.info("Starting camera calibration loop...")
+    robot_id = robot_id or get_robot_id()
+    logger.info(f"Starting camera calibration loop for robot: {robot_id}")
     
-    # Load current config
-    config = load_camera_config()
+    # Load current config for this robot
+    config = load_config(robot_id)
     hsv_ranges = config.get('hsv_ranges', {})
     
-    logger.info(f"Loaded HSV ranges: {hsv_ranges}")
+    logger.info(f"Loaded HSV ranges for {robot_id}: {hsv_ranges}")
     
     # Initialize camera
     try:
-        camera = CameraProcess()
+        camera = CameraProcess(robot_id=robot_id)
         logger.info("Camera initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize camera: {e}", exc_info=True)
@@ -165,6 +132,12 @@ def camera_calibrate_loop(fps_target: int = 10, subsystem_name: str = "camera_ca
 
 def main():
     """Entry point for camera calibration script"""
+    # Parse arguments
+    parser = argparse.ArgumentParser(description="Camera HSV calibration tool")
+    parser.add_argument('--robot', type=str, choices=['storm', 'necron'],
+                       help='Robot identifier (defaults to auto-detect)')
+    args = parser.parse_args()
+    
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -172,7 +145,7 @@ def main():
     logger.info("Camera Calibration Script starting...")
     
     # Run calibration loop
-    camera_calibrate_loop(fps_target=10)
+    camera_calibrate_loop(fps_target=10, robot_id=args.robot)
     
     logger.info("Camera Calibration Script exited")
 

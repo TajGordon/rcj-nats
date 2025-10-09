@@ -596,13 +596,33 @@ createApp({
                 return;
             }
             
-            // Send save command to debug manager
+            // Send save command to debug manager with full config
+            // We need to send the complete config structure for this robot
             const message = {
                 command: 'save_calibration',
-                hsv_ranges: {
-                    ball: robot.calibration.ball,
-                    blue_goal: robot.calibration.blue_goal,
-                    yellow_goal: robot.calibration.yellow_goal
+                robot_id: robotName,  // 'storm' or 'necron'
+                config: {
+                    camera: {
+                        width: 640,
+                        height: 480,
+                        format: 'RGB888',
+                        fps_target: 30
+                    },
+                    hsv_ranges: {
+                        ball: robot.calibration.ball,
+                        blue_goal: robot.calibration.blue_goal,
+                        yellow_goal: robot.calibration.yellow_goal
+                    },
+                    detection: {
+                        proximity_threshold: 5000,
+                        angle_tolerance: 15,
+                        goal_center_tolerance: 0.15
+                    },
+                    motors: {
+                        i2c_address: '0x50',
+                        max_speed: 255,
+                        acceleration: 50
+                    }
                 }
             };
             

@@ -36,6 +36,7 @@ import math
 import json
 
 from hypemage.logger import get_logger
+from hypemage.config import load_config, get_robot_id
 
 logger = get_logger(__name__)
 
@@ -96,17 +97,19 @@ class VisionData:
 class CameraProcess:
     """Camera that can run in a separate process with queue-based communication"""
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, robot_id: Optional[str] = None):
         """
         Initialize camera with configuration
         
         Args:
-            config: Optional configuration dict. If None, loads from camera_config.json
+            config: Optional configuration dict. If None, loads from config.json for this robot
+            robot_id: Robot identifier ('storm' or 'necron'). If None, auto-detects.
                 
         Raises:
             CameraInitializationError: If camera hardware fails to initialize
         """
-        self.config = config or self._load_config()
+        self.robot_id = robot_id or get_robot_id()
+        self.config = config or load_config(self.robot_id)
         
         # Initialize camera
         try:
@@ -194,58 +197,6 @@ class CameraProcess:
         
         # Frame counter for frame IDs
         self.frame_counter = 0
-    
-    def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from camera_config.json"""
-        config_path = Path(__file__).parent / "camera_config.json"
-        
-        if config_path.exists():
-            try:
-                with open(config_path, 'r') as f:
-                    config = json.load(f)
-                logger.info(f"Loaded camera config from {config_path}")
-                return config
-            except Exception as e:
-                logger.warning(f"Failed to load config from {config_path}: {e}")
-                return self._default_config()
-        else:
-            logger.warning(f"Config file not found: {config_path}, using defaults")
-            return self._default_config()
-    
-    def _default_config(self) -> Dict[str, Any]:
-        """Return default configuration if none provided"""
-        return {
-            'camera': {
-                'width': 640,
-                'height': 480,
-                'format': 'RGB888'
-            },
-            'hsv_ranges': {
-                'ball': {
-                    'lower': [10, 100, 100],
-                    'upper': [20, 255, 255],
-                    'min_area': 100,
-                    'max_area': 50000
-                },
-                'blue_goal': {
-                    'lower': [100, 150, 50],
-                    'upper': [120, 255, 255],
-                    'min_area': 500,
-                    'max_area': 100000
-                },
-                'yellow_goal': {
-                    'lower': [20, 100, 100],
-                    'upper': [40, 255, 255],
-                    'min_area': 500,
-                    'max_area': 100000
-                }
-            },
-            'detection': {
-                'proximity_threshold': 5000,
-                'angle_tolerance': 15,
-                'goal_center_tolerance': 0.15
-            }
-        }
     
     def _capture_picamera(self):
         """Capture frame from Picamera2"""

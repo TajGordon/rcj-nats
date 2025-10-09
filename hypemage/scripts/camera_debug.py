@@ -7,14 +7,17 @@ sent to the debug manager for display on the web dashboard.
 
 Usage:
     Launch from web interface or run directly:
-    python -m hypemage.scripts.camera_debug
+    python -m hypemage.scripts.camera_debug [--robot storm|necron]
 """
 
 import time
 import signal
+import argparse
+from typing import Optional
 
 # Import camera module and overlay functions
 from hypemage.camera import CameraProcess, add_debug_overlays, VisionData
+from hypemage.config import get_robot_id
 from hypemage.logger import get_logger
 
 logger = get_logger("camera_debug")
@@ -30,21 +33,23 @@ def signal_handler(signum, frame):
     should_stop = True
 
 
-def camera_debug_loop(fps_target: int = 30, subsystem_name: str = "camera_debug"):
+def camera_debug_loop(fps_target: int = 30, subsystem_name: str = "camera_debug", robot_id: Optional[str] = None):
     """
     Main camera debug loop - captures, detects, overlays, and sends frames
     
     Args:
         fps_target: Target frames per second
         subsystem_name: Name for debug manager subsystem registration
+        robot_id: Robot identifier ('storm' or 'necron'). If None, auto-detects.
     """
     global should_stop
     
-    logger.info("Starting camera debug loop...")
+    robot_id = robot_id or get_robot_id()
+    logger.info(f"Starting camera debug loop for robot: {robot_id}")
     
     # Initialize camera
     try:
-        camera = CameraProcess()
+        camera = CameraProcess(robot_id=robot_id)
         logger.info("Camera initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize camera: {e}", exc_info=True)
@@ -125,6 +130,12 @@ def camera_debug_loop(fps_target: int = 30, subsystem_name: str = "camera_debug"
 
 def main():
     """Entry point for camera debug script"""
+    # Parse arguments
+    parser = argparse.ArgumentParser(description="Camera debug with detection overlays")
+    parser.add_argument('--robot', type=str, choices=['storm', 'necron'], 
+                       help='Robot identifier (defaults to auto-detect)')
+    args = parser.parse_args()
+    
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -132,7 +143,7 @@ def main():
     logger.info("Camera Debug Script starting...")
     
     # Run debug loop
-    camera_debug_loop(fps_target=30)
+    camera_debug_loop(fps_target=30, robot_id=args.robot)
     
     logger.info("Camera Debug Script exited")
 

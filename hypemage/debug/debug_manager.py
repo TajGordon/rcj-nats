@@ -25,6 +25,7 @@ from typing import Dict, Any, Set
 from dataclasses import asdict
 
 from hypemage.logger import get_logger
+from hypemage.config import save_config as save_bot_config
 
 logger = get_logger(__name__)
 
@@ -94,17 +95,28 @@ class DebugManager:
         
         Args:
             data: Command data from client, e.g.:
-                  {'command': 'update_hsv', 'target': 'ball', 'lower': [...], 'upper': [...]}
+                  {'command': 'update_hsv', 'robot_id': 'storm', 'target': 'ball', 'lower': [...], 'upper': [...]}
+                  {'command': 'save_calibration', 'robot_id': 'storm', 'config': {...}}
         """
         command = data.get('command')
+        robot_id = data.get('robot_id', 'storm')  # Default to storm if not provided
         
         if command == 'update_hsv':
             # Forward HSV update to camera_calibrate script
             # TODO: Implement queue/pipe to camera_calibrate process
-            logger.info(f"HSV update request: {data}")
+            logger.info(f"HSV update request for {robot_id}: target={data.get('target')}")
         elif command == 'save_calibration':
-            # Trigger save of current calibration
-            logger.info("Save calibration request received")
+            # Save calibration for specific robot
+            try:
+                config = data.get('config')
+                if config:
+                    # Save the entire config for this robot
+                    save_bot_config(robot_id, config)
+                    logger.info(f"Saved calibration for {robot_id}")
+                else:
+                    logger.warning("No config data provided in save_calibration command")
+            except Exception as e:
+                logger.error(f"Failed to save calibration for {robot_id}: {e}")
         else:
             logger.debug(f"Unknown command: {command}")
     

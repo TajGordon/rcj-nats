@@ -4,6 +4,11 @@ Debug Manager Process
 Collects debug data from all robot subsystems and serves it via WebSocket.
 Only runs when robot is started with --debug flag.
 
+Supports multiple data types:
+- Standard debug data (motor states, localization, FSM, etc.)
+- Camera debug frames (with detection overlays)
+- Camera calibration data (original frame + HSV mask previews)
+
 Usage:
     This is started automatically by scylla.py when --debug flag is set.
     Clients connect to ws://robot:8765 to receive debug data.
@@ -14,7 +19,8 @@ import websockets
 import json
 import base64
 import queue
-import time
+import cv2
+import numpy as np
 from typing import Dict, Any, Set
 from dataclasses import asdict
 
@@ -32,7 +38,8 @@ class DebugManager:
         """
         Args:
             debug_queues: Dict of {subsystem: queue} for debug data
-                         e.g., {'camera': Queue(), 'motors': Queue()}
+                         e.g., {'camera': Queue(), 'motors': Queue(), 
+                                'camera_debug': Queue(), 'camera_calibrate': Queue()}
         """
         self.debug_queues = debug_queues
         self.ws_clients: Set[Any] = set()
@@ -43,13 +50,15 @@ class DebugManager:
             'motors': None,
             'localization': None,
             'buttons': None,
-            'fsm': None
+            'fsm': None,
+            'camera_debug': None,      # Camera with debug overlays
+            'camera_calibrate': None   # Camera calibration masks
         }
         
         self.running = True
         logger.info("Debug manager initialized")
     
-    async def handle_client(self, websocket, path):
+    async def handle_client(self, websocket):
         """Handle WebSocket client connection"""
         client_addr = websocket.remote_address
         logger.info(f"Debug client connected: {client_addr}")
@@ -62,10 +71,15 @@ class DebugManager:
                 'data': self._serialize_latest_data()
             }))
             
-            # Listen for client messages (future: could add commands)
+            # Listen for client messages (handle commands from calibration UI)
             async for message in websocket:
-                logger.debug(f"Received from client: {message}")
-                # Future: handle client commands (e.g., change debug level)
+                try:
+                    data = json.loads(message)
+                    await self._handle_client_command(data)
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON from client: {message}")
+                except Exception as e:
+                    logger.error(f"Error handling client message: {e}")
         
         except websockets.exceptions.ConnectionClosed:
             logger.info(f"Debug client disconnected: {client_addr}")
@@ -73,6 +87,26 @@ class DebugManager:
             logger.error(f"Error handling client {client_addr}: {e}")
         finally:
             self.ws_clients.remove(websocket)
+    
+    async def _handle_client_command(self, data: dict):
+        """
+        Handle commands from web clients (e.g., HSV calibration updates)
+        
+        Args:
+            data: Command data from client, e.g.:
+                  {'command': 'update_hsv', 'target': 'ball', 'lower': [...], 'upper': [...]}
+        """
+        command = data.get('command')
+        
+        if command == 'update_hsv':
+            # Forward HSV update to camera_calibrate script
+            # TODO: Implement queue/pipe to camera_calibrate process
+            logger.info(f"HSV update request: {data}")
+        elif command == 'save_calibration':
+            # Trigger save of current calibration
+            logger.info("Save calibration request received")
+        else:
+            logger.debug(f"Unknown command: {command}")
     
     def _serialize_latest_data(self):
         """Convert latest data to JSON-serializable format"""
@@ -84,6 +118,21 @@ class DebugManager:
     
     def _serialize_data(self, data):
         """Serialize dataclass to dict, handle bytes (JPEG frames)"""
+        # Handle numpy arrays (camera frames)
+        if isinstance(data, np.ndarray):
+            return self._encode_frame_to_base64(data)
+        
+        # Handle dict with frame data (calibration data)
+        if isinstance(data, dict):
+            result = {}
+            for key, value in data.items():
+                if isinstance(value, np.ndarray):
+                    result[key] = self._encode_frame_to_base64(value)
+                else:
+                    result[key] = value
+            return result
+        
+        # Handle dataclass
         result = asdict(data)
         
         # Convert bytes to base64 for JSON transmission
@@ -91,6 +140,31 @@ class DebugManager:
             result['frame_jpeg'] = base64.b64encode(result['frame_jpeg']).decode('ascii')
         
         return result
+    
+    def _encode_frame_to_base64(self, frame: np.ndarray) -> str:
+        """
+        Encode numpy frame to base64 JPEG string
+        
+        Args:
+            frame: RGB or BGR numpy array
+            
+        Returns:
+            Base64 encoded JPEG string
+        """
+        # Convert RGB to BGR if needed (OpenCV uses BGR)
+        if len(frame.shape) == 3 and frame.shape[2] == 3:
+            # Assume RGB, convert to BGR for cv2.imencode
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        else:
+            frame_bgr = frame
+        
+        # Encode as JPEG
+        _, buffer = cv2.imencode('.jpg', frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        
+        # Convert to base64
+        jpg_as_text = base64.b64encode(buffer).decode('ascii')
+        
+        return jpg_as_text
     
     async def collect_and_broadcast(self):
         """Main loop: collect from queues, broadcast to clients"""
@@ -149,7 +223,7 @@ class DebugManager:
         # Start WebSocket server
         async with websockets.serve(self.handle_client, host, port):
             logger.info(f"Debug server listening on ws://{host}:{port}")
-            logger.info(f"Clients can connect to view debug data")
+            logger.info("Clients can connect to view debug data")
             
             # Run collection loop
             await self.collect_and_broadcast()

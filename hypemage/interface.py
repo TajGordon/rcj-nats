@@ -80,6 +80,13 @@ class InterfaceServer:
                 description='Calibrate HSV ranges for ball and goal detection',
                 category='calibration'
             ),
+            'camera_calibrate': ScriptConfig(
+                name='Camera HSV Calibration',
+                module='hypemage.scripts.camera_calibrate',
+                args=[],
+                description='Interactive HSV range calibration with live mask previews',
+                category='calibration'
+            ),
             'imu_calibration': ScriptConfig(
                 name='IMU Calibration',
                 module='hypemage.calibrate_imu',  # You'd create this
@@ -89,6 +96,13 @@ class InterfaceServer:
             ),
             
             # Test scripts
+            'camera_debug': ScriptConfig(
+                name='Camera Debug View',
+                module='hypemage.scripts.camera_debug',
+                args=[],
+                description='View camera feed with detection overlays (ball, goals)',
+                category='test'
+            ),
             'motor_test': ScriptConfig(
                 name='Motor Test',
                 module='motors.motor',

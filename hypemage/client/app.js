@@ -34,6 +34,7 @@ createApp({
     mounted() {
         this.connectRobot('storm');
         this.connectRobot('necron');
+        this.initDragAndDrop();
     },
     
     methods: {
@@ -227,6 +228,64 @@ createApp({
             } else {
                 this.toggleWidget(this.currentView, widgetId);
             }
+        },
+        
+        initDragAndDrop() {
+            // Enable drag and drop for widgets in single view
+            this.$nextTick(() => {
+                let draggedElement = null;
+                
+                document.addEventListener('mousedown', (e) => {
+                    const widget = e.target.closest('.widget');
+                    if (!widget || !widget.closest('.single-view')) return;
+                    
+                    // Don't drag if clicking on buttons or interactive elements
+                    if (e.target.closest('button, input, img, .logs-container')) return;
+                    
+                    draggedElement = widget;
+                    widget.classList.add('dragging');
+                    
+                    const moveHandler = (e) => {
+                        if (!draggedElement) return;
+                        
+                        const container = draggedElement.closest('.widgets-container');
+                        const afterElement = getDragAfterElement(container, e.clientY);
+                        
+                        if (afterElement == null) {
+                            container.appendChild(draggedElement);
+                        } else {
+                            container.insertBefore(draggedElement, afterElement);
+                        }
+                    };
+                    
+                    const upHandler = () => {
+                        if (draggedElement) {
+                            draggedElement.classList.remove('dragging');
+                            draggedElement = null;
+                        }
+                        document.removeEventListener('mousemove', moveHandler);
+                        document.removeEventListener('mouseup', upHandler);
+                    };
+                    
+                    document.addEventListener('mousemove', moveHandler);
+                    document.addEventListener('mouseup', upHandler);
+                });
+                
+                function getDragAfterElement(container, y) {
+                    const draggableElements = [...container.querySelectorAll('.widget:not(.dragging)')];
+                    
+                    return draggableElements.reduce((closest, child) => {
+                        const box = child.getBoundingClientRect();
+                        const offset = y - box.top - box.height / 2;
+                        
+                        if (offset < 0 && offset > closest.offset) {
+                            return { offset: offset, element: child };
+                        } else {
+                            return closest;
+                        }
+                    }, { offset: Number.NEGATIVE_INFINITY }).element;
+                }
+            });
         }
     }
 }).mount('#app');

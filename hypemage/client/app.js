@@ -28,13 +28,16 @@ createApp({
             availableWidgets: AVAILABLE_WIDGETS,
             storm: this.createRobotState('storm'),
             necron: this.createRobotState('necron'),
-            notifications: []
+            notifications: [],
+            initialConnectionAttempted: false
         };
     },
     
     mounted() {
-        this.connectRobot('storm');
-        this.connectRobot('necron');
+        // Initial connection - silent (no notifications)
+        this.connectRobot('storm', true);
+        this.connectRobot('necron', true);
+        this.initialConnectionAttempted = true;
         this.initDragAndDrop();
     },
     
@@ -44,11 +47,11 @@ createApp({
                 name: ROBOT_CONFIG[name].name,
                 host: ROBOT_CONFIG[name].host,
                 connected: false,
+                connecting: false,
                 interfaceWs: null,
                 debugWs: null,
                 status: 'stopped',
                 pid: null,
-                debugEnabled: false,
                 camera: { fps: 0, frame: null },
                 motors: { 
                     speeds: { front_left: 0, front_right: 0, back_left: 0, back_right: 0, dribbler: 0 },
@@ -59,24 +62,39 @@ createApp({
             };
         },
         
-        connectRobot(robotName) {
-            this.connectInterface(robotName);
-            this.connectDebug(robotName);
+        connectRobot(robotName, silent = false) {
+            this.connectInterface(robotName, silent);
+            this.connectDebug(robotName, silent);
         },
         
-        connectInterface(robotName) {
+        connectInterface(robotName, silent = false) {
             const robot = this[robotName];
             const config = ROBOT_CONFIG[robotName];
-            const url = `ws://${config.host}:${config.interfacePort}/ws`;
             
+            // Prevent duplicate connections
+            if (robot.connecting || (robot.interfaceWs && robot.interfaceWs.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+            
+            // Close existing connection if any
+            if (robot.interfaceWs) {
+                robot.interfaceWs.onclose = null;
+                robot.interfaceWs.close();
+            }
+            
+            const url = `ws://${config.host}:${config.interfacePort}/ws`;
             console.log(`[${robot.name}] Connecting to interface: ${url}`);
             
+            robot.connecting = true;
             const ws = new WebSocket(url);
             
             ws.onopen = () => {
                 console.log(`[${robot.name}] Interface connected`);
                 robot.connected = true;
-                this.showNotification(`${robot.name} connected successfully`, 'success');
+                robot.connecting = false;
+                if (!silent) {
+                    this.showNotification(`${robot.name} connected`, 'success');
+                }
             };
             
             ws.onmessage = (event) => {
@@ -86,23 +104,33 @@ createApp({
             
             ws.onerror = (error) => {
                 console.error(`[${robot.name}] Interface error:`, error);
-                this.showNotification(`${robot.name} connection failed`, 'error');
+                robot.connecting = false;
+                if (!silent) {
+                    this.showNotification(`${robot.name} connection failed`, 'error');
+                }
             };
             
             ws.onclose = () => {
                 console.log(`[${robot.name}] Interface disconnected`);
                 robot.connected = false;
-                setTimeout(() => this.connectInterface(robotName), 3000);
+                robot.connecting = false;
+                // NO AUTO-RECONNECT - user must manually reconnect via badge click
             };
             
             robot.interfaceWs = ws;
         },
         
-        connectDebug(robotName) {
+        connectDebug(robotName, silent = false) {
             const robot = this[robotName];
             const config = ROBOT_CONFIG[robotName];
-            const url = `ws://${config.host}:${config.debugPort}`;
             
+            // Close existing connection if any
+            if (robot.debugWs) {
+                robot.debugWs.onclose = null;
+                robot.debugWs.close();
+            }
+            
+            const url = `ws://${config.host}:${config.debugPort}`;
             console.log(`[${robot.name}] Connecting to debug: ${url}`);
             
             const ws = new WebSocket(url);
@@ -122,9 +150,7 @@ createApp({
             
             ws.onclose = () => {
                 console.log(`[${robot.name}] Debug disconnected`);
-                if (robot.connected && robot.debugEnabled) {
-                    setTimeout(() => this.connectDebug(robotName), 3000);
-                }
+                // NO AUTO-RECONNECT - debug connection follows robot state
             };
             
             robot.debugWs = ws;
@@ -134,52 +160,54 @@ createApp({
             const robot = this[robotName];
             
             if (data.type === 'status') {
+                // Server status update
                 robot.status = data.data.robot_running ? 'running' : 'stopped';
                 robot.pid = data.data.pid;
-                robot.debugEnabled = data.data.debug_enabled || false;
             } else if (data.type === 'process_started') {
+                // Process successfully started
                 robot.status = 'running';
                 robot.pid = data.pid;
-                robot.debugEnabled = data.script && data.script.includes('debug');
+                this.showNotification(`${robot.name}: ${data.script_name || 'Script'} started`, 'success');
             } else if (data.type === 'process_stopped') {
+                // Process stopped
                 robot.status = 'stopped';
                 robot.pid = null;
-                robot.debugEnabled = false;
+                this.showNotification(`${robot.name}: Script stopped`, 'info');
+            } else if (data.type === 'error') {
+                // Error message from server
+                this.showNotification(`${robot.name}: ${data.message}`, 'error');
             }
         },
         
         handleDebugMessage(robotName, data) {
             const robot = this[robotName];
             
-            if (data.type === 'update') {
-                const subsystem = data.subsystem;
-                const payload = data.data;
-                
-                if (subsystem === 'camera') {
-                    robot.camera.fps = payload.fps || 0;
-                    if (payload.frame_jpeg) {
-                        robot.camera.frame = `data:image/jpeg;base64,${payload.frame_jpeg}`;
+            if (data.type !== 'update') return;
+            
+            const subsystem = data.subsystem;
+            const payload = data.data;
+            
+            if (subsystem === 'camera' && payload.frame_jpeg) {
+                robot.camera.fps = payload.fps || 0;
+                robot.camera.frame = `data:image/jpeg;base64,${payload.frame_jpeg}`;
+            } else if (subsystem === 'motors') {
+                // Handle both array and object formats from debug manager
+                if (Array.isArray(payload.speeds)) {
+                    MOTOR_NAMES.forEach((name, i) => {
+                        robot.motors.speeds[name] = payload.speeds[i] || 0;
+                        robot.motors.temps[name] = (payload.temps && payload.temps[i]) || 0;
+                    });
+                } else if (payload.speeds) {
+                    Object.assign(robot.motors.speeds, payload.speeds);
+                    if (payload.temps) {
+                        Object.assign(robot.motors.temps, payload.temps);
                     }
-                } else if (subsystem === 'motors') {
-                    // Handle both array and object formats
-                    if (Array.isArray(payload.speeds)) {
-                        MOTOR_NAMES.forEach((name, i) => {
-                            robot.motors.speeds[name] = payload.speeds[i] || 0;
-                            robot.motors.temps[name] = (payload.temps && payload.temps[i]) || 0;
-                        });
-                    } else {
-                        robot.motors.speeds = payload.speeds || robot.motors.speeds;
-                        robot.motors.temps = payload.temps || robot.motors.temps;
-                    }
-                } else if (subsystem === 'logs') {
-                    // Add new log entries
-                    if (payload.logs && Array.isArray(payload.logs)) {
-                        robot.logs.push(...payload.logs);
-                        // Keep only last 100 logs
-                        if (robot.logs.length > 100) {
-                            robot.logs = robot.logs.slice(-100);
-                        }
-                    }
+                }
+            } else if (subsystem === 'logs' && payload.logs && Array.isArray(payload.logs)) {
+                robot.logs.push(...payload.logs);
+                // Keep only last 100 logs
+                if (robot.logs.length > 100) {
+                    robot.logs = robot.logs.slice(-100);
                 }
             }
         },
@@ -188,19 +216,24 @@ createApp({
             const robot = this[robotName];
             
             if (!robot.interfaceWs || robot.interfaceWs.readyState !== WebSocket.OPEN) {
-                console.error(`[${robot.name}] Not connected`);
-                return;
+                this.showNotification(`${robot.name} not connected`, 'error');
+                return false;
             }
             
             robot.interfaceWs.send(JSON.stringify({ command, args }));
+            return true;
         },
         
         startRobotDebug(robotName) {
-            this.sendCommand(robotName, 'run_script', { script_id: 'scylla_debug' });
+            if (this.sendCommand(robotName, 'run_script', { script_id: 'scylla_debug' })) {
+                this.showNotification(`${this[robotName].name}: Starting debug mode...`, 'info');
+            }
         },
         
         stopRobot(robotName) {
-            this.sendCommand(robotName, 'stop_script');
+            if (this.sendCommand(robotName, 'stop_script')) {
+                this.showNotification(`${this[robotName].name}: Stopping...`, 'info');
+            }
         },
         
         toggleWidget(robotName, widgetId) {
@@ -448,11 +481,17 @@ createApp({
         
         manualReconnect(robotName) {
             const robot = this[robotName];
-            this.showNotification(`Attempting to reconnect to ${robot.name}...`, 'info');
+            
+            if (robot.connecting) {
+                this.showNotification(`${robot.name} already connecting...`, 'info');
+                return;
+            }
+            
+            this.showNotification(`Reconnecting to ${robot.name}...`, 'info');
             
             // Close existing connections
             if (robot.interfaceWs) {
-                robot.interfaceWs.onclose = null; // Prevent auto-reconnect
+                robot.interfaceWs.onclose = null;
                 robot.interfaceWs.close();
             }
             if (robot.debugWs) {
@@ -463,9 +502,9 @@ createApp({
             // Reset state
             robot.connected = false;
             
-            // Attempt new connection
+            // Attempt new connection (with notifications)
             setTimeout(() => {
-                this.connectRobot(robotName);
+                this.connectRobot(robotName, false);
             }, 100);
         },
         

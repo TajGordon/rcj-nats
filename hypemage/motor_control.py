@@ -120,7 +120,6 @@ class MotorController:
         """Default motor configuration"""
         return {
             'motor_addresses': [26, 27, 29, 25],  # Example addresses
-            'motor_multipliers': [-1.0, -1.0, 1.0, 1.0],  # Back left and front left reversed
             'max_speed': 400_000_000,
             'current_limit_foc': 65536 * 3,
             'id_pid': {'kp': 1500, 'ki': 200},

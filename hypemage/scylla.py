@@ -187,7 +187,8 @@ class Scylla:
         # Initialize motors (CRITICAL - robot cannot operate without motors)
         try:
             logger.info("Initializing motor controller...")
-            self.motor_controller = MotorController(config=self.config, threaded=True)
+            motor_config = self.config.get('motors', {})
+            self.motor_controller = MotorController(config=motor_config, threaded=True)
             self.status.motors = True
             logger.info("✓ Motor controller initialized successfully")
         except MotorInitializationError as e:

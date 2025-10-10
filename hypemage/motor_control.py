@@ -22,6 +22,7 @@ from typing import Optional, List, Dict, Any
 import time
 import threading
 import queue
+import math
 
 from hypemage.logger import get_logger
 
@@ -380,6 +381,78 @@ class MotorController:
                 pass
         else:
             self._execute_stop()
+    
+    def move_robot_relative(self, angle: float, speed: float, rotation: float = 0.0):
+        """
+        Move robot in a direction relative to the robot's current orientation
+        
+        Uses trigonometry to calculate motor speeds for omnidirectional movement.
+        Motor arrangement (looking from above):
+            M1 (front-left)    M2 (front-right)
+                    \\  /
+                     \\/
+                     /\\
+                    /  \\
+            M3 (back-left)     M4 (back-right)
+        
+        Args:
+            angle: Direction in degrees (0=forward, 90=right, 180=back, 270=left)
+            speed: Speed magnitude [0.0 to 1.0]
+            rotation: Rotation component [-1.0 to 1.0] (positive = clockwise)
+        
+        Example:
+            controller.move_robot_relative(0, 0.5)       # Move forward at half speed
+            controller.move_robot_relative(90, 0.3)      # Move right at 30% speed
+            controller.move_robot_relative(45, 0.5, 0.2) # Move diagonal with slight rotation
+        """
+        # Convert angle to radians
+        angle_rad = math.radians(angle)
+        
+        # Calculate velocity components
+        vx = speed * math.sin(angle_rad)  # Left/right component
+        vy = speed * math.cos(angle_rad)  # Forward/back component
+        
+        # Calculate motor speeds using omniwheel kinematics
+        # Each motor contributes to: forward/back, left/right, and rotation
+        m1 = vy + vx + rotation  # Front-left
+        m2 = vy - vx - rotation  # Front-right
+        m3 = vy - vx + rotation  # Back-left
+        m4 = vy + vx - rotation  # Back-right
+        
+        # Normalize to keep all speeds within [-1.0, 1.0]
+        max_speed = max(abs(m1), abs(m2), abs(m3), abs(m4))
+        if max_speed > 1.0:
+            m1 /= max_speed
+            m2 /= max_speed
+            m3 /= max_speed
+            m4 /= max_speed
+        
+        self.set_speeds([m1, m2, m3, m4])
+    
+    def move_field_relative(self, angle: float, speed: float, rotation: float, heading: float):
+        """
+        Move robot in a direction relative to the field (absolute direction)
+        
+        This compensates for the robot's current heading to move in a field-absolute direction.
+        For example, if you want to move "north" on the field regardless of which way
+        the robot is facing.
+        
+        Args:
+            angle: Target direction in field coordinates (0=towards enemy goal)
+            speed: Speed magnitude [0.0 to 1.0]
+            rotation: Rotation component [-1.0 to 1.0]
+            heading: Robot's current heading in degrees (from IMU or localization)
+        
+        Example:
+            # Robot is facing 45° right, but we want to move straight towards goal
+            controller.move_field_relative(0, 0.5, 0, robot_heading)
+            # This will automatically adjust to move "field forward" regardless of robot orientation
+        """
+        # Compensate for robot heading
+        adjusted_angle = angle - heading
+        
+        # Use robot-relative movement with adjusted angle
+        self.move_robot_relative(adjusted_angle, speed, rotation)
     
     def get_status(self) -> MotorStatus:
         """Get current motor status"""

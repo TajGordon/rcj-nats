@@ -46,7 +46,7 @@
     },
     "motor_addresses": [26, 27, 29, 25],
     "_comment_motor_addresses": "Default motor I2C addresses (can be overridden per robot)",
-    "motor_multipliers": [-1.0, -1.0, 1.0, 1.0],
+    "motor_multipliers": [1.0, -1.0, -1.0, 1.0],
     "_comment_motor_multipliers": "Default motor direction multipliers (1.0 = normal, -1.0 = reversed). Order: [back_left, front_left, front_right, back_right]",
     "max_speed": 400000000,
     "_comment_max_speed": "Maximum motor speed in encoder units",
@@ -162,7 +162,7 @@
     "motor_addresses": [27, 29, 25, 26],
     "_comment_addresses": "Order: [back_left, front_left, front_right, back_right]",
     "_comment_addresses_detail": "27=back_left, 29=front_left, 25=front_right, 26=back_right",
-    "motor_multipliers": [-1.0, -1.0, 1.0, 1.0],
+    "motor_multipliers": [1.0, -1.0, -1.0, 1.0],
     "_comment_multipliers": "All motors spin CCW, but right motors need reversal (wheels are flipped)",
     "_comment_multipliers_detail": "[back_left=1, front_left=1, front_right=-1, back_right=-1]"
   }

@@ -254,9 +254,9 @@ class CameraProcess:
         
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
-        # Filter contours by area
+        # Filter contours by area (only max area to avoid huge objects)
         filtered_contours = [x for x in contours if 
-                           self.min_ball_area < cv2.contourArea(x) < self.max_ball_area]
+                           cv2.contourArea(x) < self.max_ball_area]
         
         if not filtered_contours:
             return BallDetectionResult(detected=False)
@@ -267,6 +267,11 @@ class CameraProcess:
         center_x = int(x)
         center_y = int(y)
         radius = int(radius)
+        
+        # Filter by minimum radius (more intuitive than area)
+        min_radius = 2  # Minimum 2 pixel radius
+        if radius < min_radius:
+            return BallDetectionResult(detected=False)
         
         # Calculate proximity info
         ball_area = math.pi * radius * radius

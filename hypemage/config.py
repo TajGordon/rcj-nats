@@ -248,7 +248,7 @@ def get_default_config() -> Dict[str, Any]:
             "ball": {
                 "lower": [0, 140, 150],
                 "upper": [50, 255, 255],
-                "min_area": 100,
+                "min_area": 0,
                 "max_area": 50000
             },
             "blue_goal": {

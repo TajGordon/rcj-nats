@@ -550,63 +550,109 @@ class Scylla:
             print(f"[PAUSED] Camera frame {self.latest_camera_data.frame_id} available")
     
     def state_chase_ball(self):
-        """Active state: chase the ball"""
+        """
+        Active state: chase the ball
+        
+        Uses continuous feedback from camera to adjust movement dynamically.
+        The robot calculates the angle to the ball and moves in that direction,
+        adjusting speed based on distance and adding rotation for better alignment.
+        """
         if not self.latest_camera_data:
             return
         
         ball = self.latest_camera_data.ball
         
         if ball.detected:
-            print(f"Ball at ({ball.center_x}, {ball.center_y}), radius={ball.radius}")
-            
             # Check if ball is close and centered - transition to lineup
             if ball.is_close_and_centered:
+                logger.info("Ball is close and centered - transitioning to lineup kick")
                 self.transition_to(State.LINEUP_KICK)
                 return
             
             # Calculate angle to ball for movement
             if self.motor_controller:
-                # Get frame dimensions from camera data
-                frame_center_x = self.latest_camera_data.frame_center_x
-                frame_center_y = self.latest_camera_data.frame_center_y
+                # Calculate angle to ball using the ball's position relative to frame center
+                # horizontal_error: -1 (left) to +1 (right)
+                # vertical_error: -1 (top) to +1 (bottom)
                 
-                # Calculate angle to ball using atan2
-                # Note: atan2(y, x) where y is vertical offset, x is horizontal offset
-                ball_angle = math.degrees(math.atan2(
-                    ball.center_x - frame_center_x,  # horizontal offset (left/right)
-                    frame_center_y - ball.center_y   # vertical offset (forward/back)
+                # For robot-relative movement:
+                # - If ball is to the right (positive horizontal_error), we need to move right
+                # - If ball is forward (negative vertical_error, top of frame), we need to move forward
+                # - If ball is backward (positive vertical_error, bottom of frame), we need to move back
+                
+                # Calculate raw angle using atan2(y, x) where:
+                # - x is horizontal offset (positive = right)
+                # - y is vertical offset (positive = forward, using inverted vertical_error)
+                raw_ball_angle = math.degrees(math.atan2(
+                    ball.horizontal_error,    # horizontal offset (left/right)
+                    -ball.vertical_error      # vertical offset (forward/back, inverted)
                 ))
+                
+                # Smooth the angle using a moving average to reduce jitter
+                if not hasattr(self, '_chase_angle_history'):
+                    self._chase_angle_history = []
+                    self._chase_max_history = 5
+                
+                self._chase_angle_history.append(raw_ball_angle)
+                if len(self._chase_angle_history) > self._chase_max_history:
+                    self._chase_angle_history.pop(0)
+                
+                # Calculate smoothed angle
+                # Need to handle angle wrapping (e.g., averaging 359° and 1° should give 0°, not 180°)
+                # Convert to unit vectors, average, then convert back
+                avg_x = sum(math.cos(math.radians(a)) for a in self._chase_angle_history)
+                avg_y = sum(math.sin(math.radians(a)) for a in self._chase_angle_history)
+                ball_angle = math.degrees(math.atan2(avg_y, avg_x))
                 
                 # Calculate speed based on ball distance (closer = slower for precision)
                 # Use ball area as proxy for distance (larger area = closer ball)
-                if ball.area > 1000:  # Ball is close
-                    speed = 0.3  # Slower for precision
+                # Typical ball areas might range from 100 (far) to 10000+ (very close)
+                if ball.area > 2000:  # Ball is very close
+                    speed = 0.25  # Very slow for precision
+                elif ball.area > 1000:  # Ball is close
+                    speed = 0.4  # Moderate speed
                 elif ball.area > 500:  # Ball is medium distance
-                    speed = 0.5  # Medium speed
+                    speed = 0.6  # Medium-high speed
                 else:  # Ball is far
-                    speed = 0.7  # Faster to catch up
+                    speed = 0.8  # Fast to close distance
                 
-                # Add slight rotation to help with ball alignment
-                # If ball is off-center horizontally, add rotation
+                # Proportional rotation control for better alignment
+                # The more the ball is off-center horizontally, the more we rotate
+                # This helps keep the ball in view and approach it more directly
                 horizontal_error = ball.horizontal_error
-                if abs(horizontal_error) > 0.1:  # Ball is significantly off-center
-                    rotation = -horizontal_error * 0.3  # Proportional rotation
-                    rotation = max(-0.5, min(0.5, rotation))  # Clamp rotation
-                else:
-                    rotation = 0.0
                 
-                # Move towards ball
+                # Use a proportional controller with higher gain for more aggressive alignment
+                rotation_gain = 0.5  # Adjust this to tune how aggressively the robot rotates
+                rotation = -horizontal_error * rotation_gain
+                
+                # Clamp rotation to reasonable limits
+                max_rotation = 0.6
+                rotation = max(-max_rotation, min(max_rotation, rotation))
+                
+                # If the ball is very off-center, reduce forward speed and prioritize rotation
+                if abs(horizontal_error) > 0.5:  # Ball is way off to the side
+                    speed *= 0.5  # Slow down to rotate better
+                    logger.debug(f"Ball far off-center ({horizontal_error:.2f}), reducing speed")
+                
+                # Move towards ball with continuous adjustment
                 self.motor_controller.move_robot_relative(
                     angle=ball_angle,
                     speed=speed,
                     rotation=rotation
                 )
                 
-                print(f"Chasing ball: angle={ball_angle:.1f}°, speed={speed:.2f}, rotation={rotation:.2f}")
+                # Logging with detailed feedback
+                logger.info(
+                    f"Chasing ball: angle={ball_angle:.1f}° (raw={raw_ball_angle:.1f}°), "
+                    f"speed={speed:.2f}, rotation={rotation:.2f}, "
+                    f"h_err={horizontal_error:.2f}, v_err={ball.vertical_error:.2f}, "
+                    f"area={ball.area:.0f}"
+                )
             else:
                 logger.warning("No motor controller available for ball chasing")
         else:
-            # Lost ball - search
+            # Lost ball - transition to search
+            logger.info("Ball lost during chase - transitioning to search")
             self.transition_to(State.SEARCH_BALL)
     
     def state_defend_goal(self):
@@ -760,13 +806,27 @@ class Scylla:
     
     def on_enter_chase_ball(self):
         """Called when entering chase_ball state"""
-        print("Entering CHASE_BALL mode")
+        logger.info("Entering CHASE_BALL mode")
+        
+        # Initialize tracking variables for adaptive control
+        self._chase_last_ball_angle = None
+        self._chase_angle_history = []  # Track recent angles for smoothing
+        self._chase_max_history = 5  # Number of frames to average
+        
         # Could send camera command to prioritize ball detection
         self.queues['camera_cmd'].put({'type': 'detect_ball'})
     
     def on_exit_chase_ball(self):
         """Called when exiting chase_ball state"""
-        print("Exiting CHASE_BALL mode")
+        logger.info("Exiting CHASE_BALL mode")
+        
+        # Clean up tracking variables
+        if hasattr(self, '_chase_last_ball_angle'):
+            delattr(self, '_chase_last_ball_angle')
+        if hasattr(self, '_chase_angle_history'):
+            delattr(self, '_chase_angle_history')
+        if hasattr(self, '_chase_max_history'):
+            delattr(self, '_chase_max_history')
     
     def on_exit_search_ball(self):
         """Called when exiting search_ball state"""
@@ -833,6 +893,6 @@ if __name__ == '__main__':
     # Create and start the FSM
     scylla = Scylla(config=config)
     # TODO: TEMPORARY - Remove this line after testing square movement
-    scylla.transition_to(State.MOVE_IN_SQUARE)  # Start in square movement for testing
-    # scylla.transition_to(State.SEARCH_BALL)  # Normal starting state
+    # scylla.transition_to(State.MOVE_IN_SQUARE)  # Start in square movement for testing
+    scylla.transition_to(State.SEARCH_BALL)  # Normal starting state
     scylla.start()

@@ -275,5 +275,5 @@ def get_default_config() -> Dict[str, Any]:
             "acceleration": 50
         },
         "motor_addresses": [26, 27, 29, 25],
-        "motor_multipliers": [-1.0, -1.0, 1.0, 1.0]
+        "motor_multipliers": [1.0, -1.0, -1.0, 1.0]
     }

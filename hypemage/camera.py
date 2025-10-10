@@ -42,6 +42,7 @@ logger = get_logger(__name__)
 
 try:
     from picamera2 import Picamera2
+    from libcamera import controls
     _HAS_PICAMERA = True
     logger.info("Picamera2 library loaded successfully")
 except ImportError as e:
@@ -124,6 +125,9 @@ class CameraProcess:
                 self.picam2.start()
                 self.capture_fn = self._capture_picamera
                 logger.info("Picamera2 initialized successfully")
+                
+                # Set camera focus after initialization
+                self._focus_camera()
             else:
                 # Fallback to OpenCV
                 logger.warning("Picamera2 not available, trying OpenCV VideoCapture...")
@@ -201,6 +205,20 @@ class CameraProcess:
         
         # Frame counter for frame IDs
         self.frame_counter = 0
+    
+    def _focus_camera(self):
+        """Set camera focus to manual mode with optimal lens position"""
+        if _HAS_PICAMERA and hasattr(self, 'picam2'):
+            try:
+                # Set manual focus mode with lens position 20.0 (optimal for soccer field)
+                self.picam2.set_controls({
+                    'AfMode': controls.AfModeEnum.Manual, 
+                    'LensPosition': 20.0
+                })
+                time.sleep(2)  # Allow time for focus adjustment
+                logger.info("Camera focus set to manual mode with lens position 20.0")
+            except Exception as e:
+                logger.warning(f"Failed to set camera focus: {e}")
     
     def _capture_picamera(self):
         """Capture frame from Picamera2"""

@@ -90,7 +90,7 @@
         "lower": [0, 140, 150],
         "upper": [20, 255, 255],
         "min_area": 0,
-        "max_area": 500
+        "max_area": 50000
       },
       "blue_goal": {
         "lower": [100, 150, 50],

@@ -931,5 +931,5 @@ if __name__ == '__main__':
     scylla = Scylla(config=config)
     # TODO: TEMPORARY - Remove this line after testing square movement
     # scylla.transition_to(State.MOVE_IN_SQUARE)  # Start in square movement for testing
-    scylla.transition_to(State.SEARCH_BALL)  # Normal starting state
+    scylla.transition_to(State.MOVE_STRAIGHT)  # Normal starting state
     scylla.start()

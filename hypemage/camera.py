@@ -291,8 +291,9 @@ class CameraProcess:
                 radius = 80
         
         # Calculate forward direction with rotation offset
-        # 0 degrees = up (negative Y), rotated by robot_forward_rotation
-        angle_rad = math.radians(-90 + self.robot_forward_rotation)  # -90 because 0° is up
+        # The big yellow arrow is at 180° from the heading, so we add 180° to flip it
+        # 0 degrees = up (negative Y), rotated by robot_forward_rotation, then add 180° to flip
+        angle_rad = math.radians(-90 + self.robot_forward_rotation + 180)  # -90 because 0° is up, +180 to flip
         
         # Calculate end point
         end_x = int(center_x + radius * math.cos(angle_rad))
@@ -309,8 +310,8 @@ class CameraProcess:
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         
         # Draw additional angle markers (90°, 180°, 270°)
-        for marker_angle, label in [(0, "90°"), (90, "180°"), (180, "270°")]:
-            angle_rad = math.radians(-90 + self.robot_forward_rotation + marker_angle)
+        for marker_angle, label in [(90, "90°"), (180, "180°"), (270, "270°")]:
+            angle_rad = math.radians(-90 + self.robot_forward_rotation + 180 + marker_angle)
             marker_radius = int(radius * 0.6)
             marker_x = int(center_x + marker_radius * math.cos(angle_rad))
             marker_y = int(center_y + marker_radius * math.sin(angle_rad))

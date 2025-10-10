@@ -820,8 +820,8 @@ class Scylla:
             logger.warning("No motor controller - cannot move straight")
             return
         
-        # Move forward at 50% speed
-        forward_speed = 0.5
+        # Move forward
+        forward_speed = 0.05
         self.motor_controller.move_robot_relative(
             angle=0,  # 0° = forward
             speed=forward_speed,

@@ -58,6 +58,7 @@ class State(Enum):
     SEARCH_BALL = auto()
     LINEUP_KICK = auto()
     STOPPED = auto()
+    MOVE_IN_SQUARE = auto()  # Example state for testing movement
 
 
 @dataclass
@@ -121,6 +122,12 @@ class Scylla:
             needs_localization=False,
             needs_motors=True,  # need motors to send stop command
             update_rate_hz=10.0
+        ),
+        State.MOVE_IN_SQUARE: StateConfig(
+            needs_camera=False,
+            needs_localization=False,
+            needs_motors=True,
+            update_rate_hz=20.0
         ),
     }
     
@@ -365,14 +372,9 @@ class Scylla:
         action = event.get('action')
         
         # Global button handlers (work in any state)
-        if action == 'emergency_stop':
-            self._handle_emergency_stop()
-        elif action == 'pause':
+        # All three buttons (D13, D19, D26) now trigger pause
+        if action in ['emergency_stop', 'pause', 'toggle_mode']:
             self._handle_pause_button()
-        elif action == 'reset_heading':
-            self._handle_reset_heading()
-        elif action == 'toggle_mode':
-            self._handle_toggle_mode()
         else:
             print(f"Unknown button action: {action}")
     
@@ -385,10 +387,9 @@ class Scylla:
         
         Config format:
             config['buttons'] = {
-                'pause': board.D13,
-                'emergency_stop': board.D19,
-                'reset_heading': board.D26,
-                ...
+                'pause': board.D13,            # All three buttons now trigger pause
+                'emergency_stop': board.D19,   # Also triggers pause
+                'toggle_mode': board.D26       # Also triggers pause
             }
         """
         import digitalio
@@ -460,7 +461,7 @@ class Scylla:
                     # Button is released
                     state['last_up'] = current_time
             
-            time.sleep(0.01)  # Poll at ~100 Hz
+            time.sleep(0.05)  # Poll at ~50 Hz
     
     # ==================== BUTTON ACTION HANDLERS ====================
     
@@ -617,6 +618,76 @@ class Scylla:
         # Send stop command to motors
         print("STOPPED - press 'p' to unpause")
     
+    def state_move_in_square(self):
+        """
+        Example state: Move in a square pattern using robot-relative movement
+        
+        This demonstrates:
+        - Using move_robot_relative() for directional movement
+        - State transitions based on timing
+        - GPIO button input to exit state
+        - Simple movement pattern without camera/localization
+        
+        Press button on GPIO D26 to exit to STOPPED state.
+        """
+        # Initialize state variables on first entry (using hasattr to check)
+        if not hasattr(self, '_square_state_init'):
+            self._square_state_init = True
+            self._square_step = 0  # 0=forward, 1=left, 2=back, 3=right
+            self._square_start_time = time.time()
+            self._square_step_duration = 1.0  # 1 second per side
+            self._square_speed = 0.3  # 30% speed
+            
+            # Setup GPIO button on D26 (if not already setup)
+            try:
+                import board
+                import digitalio
+                from buttons.button import Button
+                if not hasattr(self, '_exit_button'):
+                    self._exit_button = Button(board.D26, name="Exit", pull=digitalio.Pull.UP)
+                    logger.info("Square movement: GPIO D26 button configured for exit")
+            except Exception as e:
+                logger.warning(f"Could not setup GPIO button: {e}")
+                self._exit_button = None
+        
+        # Check for exit button press
+        if self._exit_button and self._exit_button.is_pressed():
+            logger.info("Exit button pressed - stopping square movement")
+            if self.motor_controller:
+                self.motor_controller.stop()
+            self.transition_to(State.STOPPED)
+            # Cleanup state variables
+            delattr(self, '_square_state_init')
+            return
+        
+        # Calculate which step we're on
+        elapsed = time.time() - self._square_start_time
+        
+        # Check if we need to move to next step
+        if elapsed > self._square_step_duration:
+            self._square_step = (self._square_step + 1) % 4  # Cycle through 0-3
+            self._square_start_time = time.time()
+            logger.info(f"Square movement: step {self._square_step}")
+        
+        # Execute movement based on current step
+        if not self.motor_controller:
+            logger.warning("No motor controller - cannot move in square")
+            return
+        
+        # Map step to direction:
+        # 0 = forward (0°), 1 = left (270°), 2 = back (180°), 3 = right (90°)
+        directions = [0, 270, 180, 90]
+        current_direction = directions[self._square_step]
+        
+        # Move in current direction
+        self.motor_controller.move_robot_relative(
+            angle=current_direction,
+            speed=self._square_speed,
+            rotation=0.0
+        )
+        
+        print(f"[SQUARE] Step {self._square_step}, Direction {current_direction}°, Speed {self._square_speed}")
+    
     # ==================== STATE ENTER/EXIT HOOKS ====================
     
     def on_enter_chase_ball(self):
@@ -669,9 +740,8 @@ if __name__ == '__main__':
         config = {
             'buttons': {
                 'pause': board.D13,           # Button 1: Pause/Resume
-                'emergency_stop': board.D19,  # Button 2: Emergency Stop
-                'reset_heading': board.D26,   # Button 3: Reset IMU heading
-                'toggle_mode': board.D6       # Button 4: Toggle offense/defense
+                'emergency_stop': board.D19,  # Button 2: Emergency Stop (also pauses)
+                'toggle_mode': board.D26      # Button 3: Toggle mode (also pauses)
             },
             'camera': {
                 # Camera config can go here
@@ -683,5 +753,7 @@ if __name__ == '__main__':
     
     # Create and start the FSM
     scylla = Scylla(config=config)
-    scylla.transition_to(State.SEARCH_BALL)  # start in search mode
+    # TODO: TEMPORARY - Remove this line after testing square movement
+    scylla.transition_to(State.MOVE_IN_SQUARE)  # Start in square movement for testing
+    # scylla.transition_to(State.SEARCH_BALL)  # Normal starting state
     scylla.start()

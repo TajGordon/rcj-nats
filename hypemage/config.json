@@ -8,6 +8,24 @@
       "format": "RGB888",
       "fps_target": 30
     },
+    "mirror": {
+      "_comment": "Circular mirror detection settings for omnidirectional camera",
+      "enable": true,
+      "detection_method": "hough",
+      "_comment_detection_method": "Detection method: 'hough' (Hough Circle Transform) or 'contour' (contour-based)",
+      "min_radius": 150,
+      "max_radius": 400,
+      "detection_interval": 30,
+      "_comment_detection_interval": "Detect mirror circle every N frames (saves computation)",
+      "fallback_radius": 250,
+      "_comment_fallback_radius": "Fallback radius if mirror not detected",
+      "canny_threshold1": 50,
+      "canny_threshold2": 150,
+      "hough_param1": 100,
+      "_comment_hough_param1": "Canny edge detector high threshold for Hough transform",
+      "hough_param2": 30,
+      "_comment_hough_param2": "Accumulator threshold for Hough circle centers (lower = more circles detected)"
+    },
     "detection": {
       "proximity_threshold": 5000,
       "angle_tolerance": 15,

@@ -150,6 +150,10 @@ class Scylla:
         self.current_state = State.PAUSED
         self.previous_state = None
         
+        # Global pause/play state
+        self._is_paused = False  # False = playing, True = paused
+        self._pause_state_backup = {}  # Store state variables when pausing
+        
         # Component status tracking
         self.status = ComponentStatus()
         
@@ -374,15 +378,16 @@ class Scylla:
         """
         Dispatch button events to appropriate handlers
         
+        Any button press toggles the global pause/play state.
+        
         Args:
             event: Dict with 'type': 'button_press', 'action': '<action_name>', 'timestamp': <time>
         """
         action = event.get('action')
         
-        # Global button handlers (work in any state)
-        # All three buttons (D13, D19, D26) now trigger pause
+        # ANY button press toggles pause/play
         if action in ['emergency_stop', 'pause', 'toggle_mode']:
-            self._handle_pause_button()
+            self._toggle_pause()
         else:
             print(f"Unknown button action: {action}")
     
@@ -473,39 +478,74 @@ class Scylla:
     
     # ==================== BUTTON ACTION HANDLERS ====================
     
-    def _handle_emergency_stop(self):
-        """Handle emergency stop button"""
-        print("Emergency stop button pressed!")
-        self.transition_to(State.STOPPED)
-    
-    def _handle_pause_button(self):
-        """Handle pause/unpause button"""
-        if self.current_state != State.PAUSED:
-            print("Pause button pressed - pausing")
-            self.transition_to(State.PAUSED)
+    def _toggle_pause(self):
+        """
+        Toggle global pause/play state
+        
+        Any button press toggles between paused and playing.
+        When pausing: stops motors and backs up state variables
+        When resuming: restores state variables and allows state logic to resume
+        """
+        self._is_paused = not self._is_paused
+        
+        if self._is_paused:
+            print("⏸️  PAUSED - Press any button to resume")
+            # Stop motors immediately
+            if self.motor_controller:
+                self.motor_controller.stop()
+            # Backup current state variables for resume
+            self._backup_state_vars()
         else:
-            print("Pause button pressed - resuming")
-            # Resume to previous state or default to search
-            self.transition_to(self.previous_state or State.SEARCH_BALL)
+            print("▶️  RESUMED - Continuing from saved state")
+            # Restore state variables to continue from where we left off
+            self._restore_state_vars()
     
-    def _handle_reset_heading(self):
-        """Handle reset heading button - resets IMU heading to 0"""
-        print("Reset heading button pressed")
-        # Send command to localization process to reset IMU
-        if 'localization' in self.processes:
-            self.queues['loc_cmd'].put({'type': 'reset_heading'})
+    def _backup_state_vars(self):
+        """
+        Backup state-specific variables before pausing
+        
+        Stores all instance variables that start with '_' (state variables)
+        into _pause_state_backup for later restoration
+        """
+        self._pause_state_backup.clear()
+        
+        # Get all state-specific variables (those starting with state name or common patterns)
+        state_var_patterns = [
+            '_chase_',
+            '_search_',
+            '_square_',
+            '_lineup_',
+            '_defend_',
+            '_attack_'
+        ]
+        
+        for attr_name in dir(self):
+            # Check if it's a state variable
+            if any(attr_name.startswith(pattern) for pattern in state_var_patterns):
+                try:
+                    value = getattr(self, attr_name)
+                    # Only backup data attributes, not methods
+                    if not callable(value):
+                        self._pause_state_backup[attr_name] = value
+                        logger.debug(f"Backed up state variable: {attr_name}")
+                except AttributeError:
+                    pass
     
-    def _handle_toggle_mode(self):
-        """Handle mode toggle button - cycles through offensive/defensive modes"""
-        print("Toggle mode button pressed")
-        # Example: toggle between chase and defend
-        if self.current_state == State.CHASE_BALL:
-            self.transition_to(State.DEFEND_GOAL)
-        elif self.current_state == State.DEFEND_GOAL:
-            self.transition_to(State.CHASE_BALL)
-        else:
-            # If in other state, go to chase
-            self.transition_to(State.CHASE_BALL)
+    def _restore_state_vars(self):
+        """
+        Restore state-specific variables after resuming from pause
+        
+        Restores all variables from _pause_state_backup
+        """
+        for attr_name, value in self._pause_state_backup.items():
+            try:
+                setattr(self, attr_name, value)
+                logger.debug(f"Restored state variable: {attr_name}")
+            except Exception as e:
+                logger.warning(f"Failed to restore {attr_name}: {e}")
+        
+        # Clear the backup after restoration
+        self._pause_state_backup.clear()
     
     def transition_to(self, new_state: State):
         """Transition to a new state with proper cleanup"""
@@ -547,11 +587,19 @@ class Scylla:
     
     def state_off_field(self):
         """Robot is off the field - minimal processing"""
+        # Check for pause
+        if self._is_paused:
+            return
+        
         # Just wait for button input to resume
         pass
     
     def state_paused(self):
         """Robot is paused - no motor control"""
+        # Check for pause
+        if self._is_paused:
+            return
+        
         # Could display debug info, wait for unpause
         if self.latest_camera_data:
             print(f"[PAUSED] Camera frame {self.latest_camera_data.frame_id} available")
@@ -564,6 +612,10 @@ class Scylla:
         The robot calculates the angle to the ball and moves in that direction,
         adjusting speed based on distance and adding rotation for better alignment.
         """
+        # Check for pause
+        if self._is_paused:
+            return
+        
         if not self.latest_camera_data:
             return
         
@@ -664,6 +716,10 @@ class Scylla:
     
     def state_defend_goal(self):
         """Defensive positioning"""
+        # Check for pause
+        if self._is_paused:
+            return
+        
         if not self.latest_localization_data:
             return
         
@@ -672,6 +728,10 @@ class Scylla:
     
     def state_attack_goal(self):
         """Attacking - move ball toward opponent goal"""
+        # Check for pause
+        if self._is_paused:
+            return
+        
         if not self.latest_camera_data:
             return
         
@@ -684,6 +744,10 @@ class Scylla:
     
     def state_search_ball(self):
         """Ball lost - search pattern"""
+        # Check for pause
+        if self._is_paused:
+            return
+        
         print("Searching for ball...")
         
         # Check if ball is found
@@ -720,6 +784,10 @@ class Scylla:
     
     def state_lineup_kick(self):
         """Line up for a kick"""
+        # Check for pause
+        if self._is_paused:
+            return
+        
         if not self.latest_camera_data:
             return
         
@@ -736,6 +804,10 @@ class Scylla:
     
     def state_stopped(self):
         """Emergency stop - motors stopped"""
+        # Check for pause
+        if self._is_paused:
+            return
+        
         # Send stop command to motors
         print("STOPPED - press 'p' to unpause")
     
@@ -746,11 +818,14 @@ class Scylla:
         This demonstrates:
         - Using move_robot_relative() for directional movement
         - State transitions based on timing
-        - GPIO button input to exit state
         - Simple movement pattern without camera/localization
         
-        Press button on GPIO D26 to exit to STOPPED state.
+        Press any button to pause.
         """
+        # Check for pause
+        if self._is_paused:
+            return
+        
         # Initialize state variables on first entry (using hasattr to check)
         if not hasattr(self, '_square_state_init'):
             self._square_state_init = True
@@ -758,28 +833,6 @@ class Scylla:
             self._square_start_time = time.time()
             self._square_step_duration = 1.0  # 1 second per side
             self._square_speed = 0.05
-            
-            # Setup GPIO button on D26 (if not already setup)
-            try:
-                import board
-                import digitalio
-                from buttons.button import Button
-                if not hasattr(self, '_exit_button'):
-                    self._exit_button = Button(board.D26, name="Exit", pull=digitalio.Pull.UP)
-                    logger.info("Square movement: GPIO D26 button configured for exit")
-            except Exception as e:
-                logger.warning(f"Could not setup GPIO button: {e}")
-                self._exit_button = None
-        
-        # Check for exit button press
-        if self._exit_button and self._exit_button.is_pressed():
-            logger.info("Exit button pressed - stopping square movement")
-            if self.motor_controller:
-                self.motor_controller.stop()
-            self.transition_to(State.STOPPED)
-            # Cleanup state variables
-            delattr(self, '_square_state_init')
-            return
         
         # Calculate which step we're on
         elapsed = time.time() - self._square_start_time
@@ -814,20 +867,15 @@ class Scylla:
         Move robot forward in a straight line
         
         This state simply moves the robot forward at a constant speed.
-        Press any button to stop.
+        Press any button to pause.
         """
+        # Check for pause
+        if self._is_paused:
+            return
+        
         if not self.motor_controller:
             logger.warning("No motor controller - cannot move straight")
             return
-        
-        # Check for button input to stop
-        if self.latest_button_input:
-            action = self.latest_button_input.get('action')
-            if action in ['emergency_stop', 'pause', 'toggle_mode']:
-                logger.info("Button pressed - stopping straight line movement")
-                self.motor_controller.stop()
-                self.transition_to(State.STOPPED)
-                return
         
         # Move forward
         forward_speed = 0.05
@@ -875,6 +923,21 @@ class Scylla:
             delattr(self, '_search_start_time')
         if hasattr(self, '_search_direction'):
             delattr(self, '_search_direction')
+    
+    def on_exit_move_in_square(self):
+        """Called when exiting move_in_square state"""
+        logger.info("Exiting MOVE_IN_SQUARE mode")
+        # Clean up square state variables
+        if hasattr(self, '_square_state_init'):
+            delattr(self, '_square_state_init')
+        if hasattr(self, '_square_step'):
+            delattr(self, '_square_step')
+        if hasattr(self, '_square_start_time'):
+            delattr(self, '_square_start_time')
+        if hasattr(self, '_square_step_duration'):
+            delattr(self, '_square_step_duration')
+        if hasattr(self, '_square_speed'):
+            delattr(self, '_square_speed')
     
     def on_enter_stopped(self):
         """Called when entering stopped state"""

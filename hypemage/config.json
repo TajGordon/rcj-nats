@@ -19,6 +19,8 @@
       "_comment_detection_interval": "Detect mirror circle every N frames (450 frames = ~15 seconds at 30fps)",
       "fallback_radius": 250,
       "_comment_fallback_radius": "Fallback radius if mirror not detected",
+      "robot_forward_rotation": 0,
+      "_comment_robot_forward_rotation": "Rotation offset in degrees to align camera with robot (0, 90, 180, or 270)",
       "canny_threshold1": 50,
       "canny_threshold2": 150,
       "hough_param1": 100,

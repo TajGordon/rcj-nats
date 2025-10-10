@@ -7,8 +7,8 @@ const { createApp } = Vue;
 
 // Robot configuration - EDIT THESE IPs
 const ROBOT_CONFIG = {
-    storm: { name: 'Storm', host: 'localhost', interfacePort: 8080, debugPort: 8765 },
-    necron: { name: 'Necron', host: 'localhost', interfacePort: 8081, debugPort: 8766 }
+    storm: { name: 'Storm', host: 'f7.local', interfacePort: 8080, debugPort: 8765 },
+    necron: { name: 'Necron', host: 'm7.local', interfacePort: 8081, debugPort: 8766 }
 };
 
 const AVAILABLE_WIDGETS = [

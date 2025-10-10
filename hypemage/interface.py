@@ -32,6 +32,7 @@ from typing import Dict, Any, Optional, List, Set
 import threading
 import time
 from dataclasses import dataclass
+import socket
 
 from hypemage.logger import get_logger
 
@@ -494,18 +495,52 @@ async def websocket_endpoint(websocket: WebSocket):
 #     pass
 
 
+def get_robot_port() -> int:
+    """
+    Determine which port to use based on hostname.
+    
+    Returns:
+        8080 for Storm (f7), 8081 for Necron (m7), 8080 default
+    """
+    try:
+        hostname = socket.gethostname().lower()
+        logger.info(f"Detected hostname: {hostname}")
+        
+        # Storm uses port 8080
+        if 'f7' in hostname:
+            logger.info("Detected Storm robot (f7) - using port 8080")
+            return 8080
+        
+        # Necron uses port 8081
+        elif 'm7' in hostname:
+            logger.info("Detected Necron robot (m7) - using port 8081")
+            return 8081
+        
+        # Default to 8080
+        else:
+            logger.warning(f"Unknown hostname '{hostname}' - defaulting to port 8080")
+            return 8080
+            
+    except Exception as e:
+        logger.error(f"Failed to detect hostname: {e} - defaulting to port 8080")
+        return 8080
+
+
 def main():
     """Run the interface server"""
     import uvicorn
     
+    # Determine port based on robot hostname
+    port = get_robot_port()
+    
     logger.info("Starting Robot Interface Server")
-    logger.info("Dashboard: http://0.0.0.0:8080")
-    logger.info("WebSocket: ws://0.0.0.0:8080/ws")
+    logger.info(f"Dashboard: http://0.0.0.0:{port}")
+    logger.info(f"WebSocket: ws://0.0.0.0:{port}/ws")
     
     uvicorn.run(
         app,
         host='0.0.0.0',
-        port=8080,
+        port=port,
         log_level='info'
     )
 

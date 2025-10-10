@@ -285,6 +285,12 @@ createApp({
             }
         },
         
+        startScript(robotName, scriptId) {
+            if (this.sendCommand(robotName, 'run_script', { script_id: scriptId })) {
+                this.showNotification(`${this[robotName].name}: Starting ${scriptId}...`, 'info');
+            }
+        },
+        
         stopRobot(robotName) {
             if (this.sendCommand(robotName, 'stop_script')) {
                 this.showNotification(`${this[robotName].name}: Stopping...`, 'info');

@@ -58,8 +58,13 @@
                         <div v-if="storm.visibleWidgets.has('controls')" class="widget">
                             <h3>🎮 Control</h3>
                             <div class="button-group">
-                                <button @click="startRobotDebug('storm')" :disabled="storm.status === 'running'" class="btn btn-primary">▶️ Debug</button>
+                                <button @click="startScript('storm', 'scylla_debug')" :disabled="storm.status === 'running'" class="btn btn-primary">▶️ Robot</button>
                                 <button @click="stopRobot('storm')" :disabled="storm.status !== 'running'" class="btn btn-danger">⏹️ Stop</button>
+                            </div>
+                            <div class="button-group">
+                                <button @click="startScript('storm', 'camera_stream')" :disabled="storm.status === 'running'" class="btn btn-secondary">📷 Camera</button>
+                                <button @click="startScript('storm', 'camera_debug')" :disabled="storm.status === 'running'" class="btn btn-secondary">🔍 Debug</button>
+                                <button @click="startScript('storm', 'camera_calibrate')" :disabled="storm.status === 'running'" class="btn btn-secondary">🎨 Calibrate</button>
                             </div>
                             <div class="status-info">
                                 <p><strong>Status:</strong> {{ storm.status }}</p>
@@ -258,8 +263,13 @@
                         <div v-if="necron.visibleWidgets.has('controls')" class="widget">
                             <h3>🎮 Control</h3>
                             <div class="button-group">
-                                <button @click="startRobotDebug('necron')" :disabled="necron.status === 'running'" class="btn btn-primary">▶️ Debug</button>
+                                <button @click="startScript('necron', 'scylla_debug')" :disabled="necron.status === 'running'" class="btn btn-primary">▶️ Robot</button>
                                 <button @click="stopRobot('necron')" :disabled="necron.status !== 'running'" class="btn btn-danger">⏹️ Stop</button>
+                            </div>
+                            <div class="button-group">
+                                <button @click="startScript('necron', 'camera_stream')" :disabled="necron.status === 'running'" class="btn btn-secondary">📷 Camera</button>
+                                <button @click="startScript('necron', 'camera_debug')" :disabled="necron.status === 'running'" class="btn btn-secondary">🔍 Debug</button>
+                                <button @click="startScript('necron', 'camera_calibrate')" :disabled="necron.status === 'running'" class="btn btn-secondary">🎨 Calibrate</button>
                             </div>
                             <div class="status-info">
                                 <p><strong>Status:</strong> {{ necron.status }}</p>

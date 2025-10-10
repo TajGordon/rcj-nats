@@ -72,7 +72,7 @@ class CameraStreamer:
                     continue
                 
                 try:
-                    # Run detections (detections expect RGB input)
+                    # Run detections (detections expect BGR input from Picamera2)
                     ball = self.camera.detect_ball(frame)
                     blue_goal, yellow_goal = self.camera.detect_goals(frame)
                     
@@ -87,7 +87,7 @@ class CameraStreamer:
                     )
                     
                     # Add debug overlays safely
-                    # add_debug_overlays expects RGB and returns BGR
+                    # add_debug_overlays expects BGR and returns BGR
                     debug_frame = add_debug_overlays(frame, vision_data)
                     
                 except Exception as e:
@@ -95,11 +95,8 @@ class CameraStreamer:
                     import traceback
                     traceback.print_exc()
                     # Fall back to plain frame
-                    # Ensure it's in BGR for encoding
-                    if len(frame.shape) == 3 and frame.shape[2] == 3:
-                        debug_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                    else:
-                        debug_frame = frame
+                    # Frame is already in BGR format from Picamera2
+                    debug_frame = frame.copy()
                 
                 try:
                     # Encode to JPEG (expects BGR)

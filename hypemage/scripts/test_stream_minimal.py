@@ -56,11 +56,8 @@ class SimpleStreamer:
                 
                 log(f"Frame {self.frame_count}: shape={frame.shape}, dtype={frame.dtype}")
                 
-                # Convert RGB to BGR for JPEG encoding
-                if len(frame.shape) == 3 and frame.shape[2] == 3:
-                    bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                else:
-                    bgr_frame = frame
+                # Frame is already in BGR format from Picamera2
+                bgr_frame = frame
                 
                 # Add simple text overlay to confirm it's working
                 cv2.putText(bgr_frame, f"Frame: {self.frame_count}", (10, 30),

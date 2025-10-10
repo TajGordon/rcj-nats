@@ -42,6 +42,7 @@ logger = get_logger(__name__)
 
 try:
     from picamera2 import Picamera2
+    from libcamera import controls
     _HAS_PICAMERA = True
     logger.info("Picamera2 library loaded successfully")
 except ImportError as e:
@@ -124,6 +125,9 @@ class CameraProcess:
                 self.picam2.start()
                 self.capture_fn = self._capture_picamera
                 logger.info("Picamera2 initialized successfully")
+                
+                # Set camera focus after initialization
+                self._focus_camera()
             else:
                 # Fallback to OpenCV
                 logger.warning("Picamera2 not available, trying OpenCV VideoCapture...")
@@ -202,6 +206,20 @@ class CameraProcess:
         # Frame counter for frame IDs
         self.frame_counter = 0
     
+    def _focus_camera(self):
+        """Set camera focus to manual mode with optimal lens position"""
+        if _HAS_PICAMERA and hasattr(self, 'picam2'):
+            try:
+                # Set manual focus mode with lens position 20.0 (optimal for soccer field)
+                self.picam2.set_controls({
+                    'AfMode': controls.AfModeEnum.Manual, 
+                    'LensPosition': 20.0
+                })
+                time.sleep(2)  # Allow time for focus adjustment
+                logger.info("Camera focus set to manual mode with lens position 20.0")
+            except Exception as e:
+                logger.warning(f"Failed to set camera focus: {e}")
+    
     def _capture_picamera(self):
         """Capture frame from Picamera2"""
         return self.picam2.capture_array()
@@ -210,7 +228,8 @@ class CameraProcess:
         """Capture frame from OpenCV VideoCapture"""
         ret, frame = self.cap.read()
         if ret:
-            return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # OpenCV VideoCapture returns BGR, so return as-is for consistency
+            return frame
         return None
     
     def capture_frame(self):
@@ -222,16 +241,13 @@ class CameraProcess:
         Detect orange ball in the frame using HSV color filtering
         
         Args:
-            frame: Input frame from camera (RGB)
+            frame: Input frame from camera (BGR from Picamera2)
             
         Returns:
             BallDetectionResult with detection info
         """
-        # Convert to HSV (handle both RGB and BGR)
-        if frame.shape[2] == 3:
-            hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
-        else:
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        # Convert to HSV (Picamera2 returns BGR format)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         
         mask = cv2.inRange(hsv, self.lower_orange, self.upper_orange)
         mask = self._apply_circular_mask(mask)
@@ -277,16 +293,13 @@ class CameraProcess:
         Detect blue and yellow goals in the frame
         
         Args:
-            frame: Input frame from camera (RGB)
+            frame: Input frame from camera (BGR from Picamera2)
             
         Returns:
             Tuple of (blue_goal_result, yellow_goal_result)
         """
-        # Convert to HSV
-        if frame.shape[2] == 3:
-            hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
-        else:
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        # Convert to HSV (Picamera2 returns BGR format)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         
         blue_result = self._detect_single_goal(hsv, self.blue_goal_config)
         yellow_result = self._detect_single_goal(hsv, self.yellow_goal_config)
@@ -466,8 +479,8 @@ def camera_start(cmd_q, out_q, stop_evt, config=None):
                 if cmd_type == 'capture_frame':
                     compress = cmd.get('compress', True)
                     if compress:
-                        # Compress to JPEG
-                        ok, jpg = cv2.imencode('.jpg', cv2.cvtColor(frame, cv2.COLOR_RGB2BGR), 
+                        # Compress to JPEG (frame is already BGR)
+                        ok, jpg = cv2.imencode('.jpg', frame, 
                                               [int(cv2.IMWRITE_JPEG_QUALITY), 60])
                         if ok:
                             vision_data.frame_bytes = jpg.tobytes()
@@ -519,7 +532,7 @@ def add_debug_overlays(frame: np.ndarray, vision_data: VisionData) -> np.ndarray
     Add debug overlays to frame showing detection results
     
     Args:
-        frame: RGB frame from camera
+        frame: BGR frame from camera (Picamera2 format)
         vision_data: Detection results to visualize
         
     Returns:
@@ -532,19 +545,19 @@ def add_debug_overlays(frame: np.ndarray, vision_data: VisionData) -> np.ndarray
     # Get frame dimensions for bounds checking
     frame_height, frame_width = frame.shape[:2]
     
-    # Convert RGB to BGR for OpenCV drawing
-    # Handle cases where frame might already be BGR or grayscale
-    # if len(frame.shape) == 2:
-    #     # Grayscale - convert to BGR
-    #     # display_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-    # elif frame.shape[2] == 4:
-    #     # RGBA - convert to BGR
-    #     # display_frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
-    # elif frame.shape[2] == 3:
-    #     # Assume RGB, convert to BGR
-    #     # display_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    # else:
-    display_frame = frame.copy()
+    # Frame is already in BGR format from Picamera2, so just copy it
+    # Handle cases where frame might be grayscale or other formats
+    if len(frame.shape) == 2:
+        # Grayscale - convert to BGR
+        display_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    elif frame.shape[2] == 4:
+        # RGBA - convert to BGR
+        display_frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+    elif frame.shape[2] == 3:
+        # Already BGR from Picamera2, just copy
+        display_frame = frame.copy()
+    else:
+        display_frame = frame.copy()
     
     # Draw ball detection
     if vision_data.ball.detected:
@@ -634,7 +647,7 @@ def create_mask_preview(frame: np.ndarray, lower_hsv: np.ndarray, upper_hsv: np.
     Create a mask preview showing what the HSV range captures
     
     Args:
-        frame: RGB frame from camera
+        frame: BGR frame from camera (Picamera2 format)
         lower_hsv: Lower HSV bounds [H, S, V]
         upper_hsv: Upper HSV bounds [H, S, V]
         label: Optional label to add to preview
@@ -642,8 +655,8 @@ def create_mask_preview(frame: np.ndarray, lower_hsv: np.ndarray, upper_hsv: np.
     Returns:
         BGR image showing the mask (white = detected, black = not detected)
     """
-    # Convert to HSV
-    hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+    # Convert to HSV (Picamera2 returns BGR format)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     
     # Create mask
     mask = cv2.inRange(hsv, lower_hsv, upper_hsv)

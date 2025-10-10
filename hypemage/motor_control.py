@@ -90,6 +90,10 @@ class MotorController:
         self.motor_count = 0
         self.i2c = None
         
+        # Motor direction multipliers (for inverting motor directions)
+        # Default: all motors forward, but can be overridden in config
+        self.motor_multipliers = self.config.get('motor_multipliers', [1.0, 1.0, 1.0, 1.0])
+        
         # Current state
         self.current_speeds = [0.0, 0.0, 0.0, 0.0]
         self.last_command_time = 0.0
@@ -322,6 +326,9 @@ class MotorController:
                 continue
             
             try:
+                # Apply motor multiplier (for direction correction)
+                speed = speed * self.motor_multipliers[i]
+                
                 # Clamp speed to [-1.0, 1.0]
                 speed = max(-1.0, min(1.0, speed))
                 
@@ -387,13 +394,13 @@ class MotorController:
         Move robot in a direction relative to the robot's current orientation
         
         Uses trigonometry to calculate motor speeds for omnidirectional movement.
-        Motor arrangement (looking from above):
-            M1 (front-left)    M2 (front-right)
+        Motor arrangement (looking from above, motor order in array):
+            [0] Back-left      [1] Front-left
                     \\  /
                      \\/
                      /\\
                     /  \\
-            M3 (back-left)     M4 (back-right)
+            [2] Front-right    [3] Back-right
         
         Args:
             angle: Direction in degrees (0=forward, 90=right, 180=back, 270=left)
@@ -414,20 +421,21 @@ class MotorController:
         
         # Calculate motor speeds using omniwheel kinematics
         # Each motor contributes to: forward/back, left/right, and rotation
-        m1 = vy + vx + rotation  # Front-left
-        m2 = vy - vx - rotation  # Front-right
-        m3 = vy - vx + rotation  # Back-left
-        m4 = vy + vx - rotation  # Back-right
+        # Motor order: [back_left, front_left, front_right, back_right]
+        back_left = vy - vx + rotation
+        front_left = vy + vx + rotation
+        front_right = vy - vx - rotation
+        back_right = vy + vx - rotation
         
         # Normalize to keep all speeds within [-1.0, 1.0]
-        max_speed = max(abs(m1), abs(m2), abs(m3), abs(m4))
+        max_speed = max(abs(back_left), abs(front_left), abs(front_right), abs(back_right))
         if max_speed > 1.0:
-            m1 /= max_speed
-            m2 /= max_speed
-            m3 /= max_speed
-            m4 /= max_speed
+            back_left /= max_speed
+            front_left /= max_speed
+            front_right /= max_speed
+            back_right /= max_speed
         
-        self.set_speeds([m1, m2, m3, m4])
+        self.set_speeds([back_left, front_left, front_right, back_right])
     
     def move_field_relative(self, angle: float, speed: float, rotation: float, heading: float):
         """

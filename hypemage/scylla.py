@@ -868,11 +868,11 @@ class Scylla:
                 
                 # Use a proportional controller for alignment
                 # Positive horizontal_error = ball to the right, so we need to rotate right (positive rotation)
-                rotation_gain = 0.3  # Moderate gain for smooth alignment
+                rotation_gain = 0.05  # Reduced gain for slower rotation
                 rotation = horizontal_error * rotation_gain
                 
                 # Clamp rotation to reasonable limits
-                max_rotation = 0.4
+                max_rotation = 0.1  # Reduced max rotation speed
                 rotation = max(-max_rotation, min(max_rotation, rotation))
                 
                 # If the ball is very off-center, reduce forward speed and prioritize rotation
@@ -959,7 +959,7 @@ class Scylla:
                 print("Starting ball search pattern")
             
             # Rotate slowly to search for ball
-            search_speed = 0.2  # Slow rotation speed
+            search_speed = 0.05  # Slow rotation speed (reduced from 0.2)
             self.motor_controller.move_robot_relative(
                 angle=0,  # No forward/back movement
                 speed=0,  # No translation

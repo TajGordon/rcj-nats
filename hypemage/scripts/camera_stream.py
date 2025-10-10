@@ -11,6 +11,7 @@ Usage:
 import asyncio
 from aiohttp import web
 import cv2
+import numpy as np
 import time
 import socket
 import sys
@@ -53,52 +54,84 @@ class CameraStreamer:
                 start_time = time.time()
                 
                 # Capture frame from camera
-                frame = self.camera.capture_frame()
+                try:
+                    frame = self.camera.capture_frame()
+                except Exception as e:
+                    log(f"ERROR capturing frame: {e}")
+                    await asyncio.sleep(0.1)
+                    continue
                 
                 if frame is None:
                     await asyncio.sleep(0.1)
                     continue
                 
-                # Run detections
-                ball = self.camera.detect_ball(frame)
-                blue_goal, yellow_goal = self.camera.detect_goals(frame)
+                # Validate frame
+                if not isinstance(frame, np.ndarray) or frame.size == 0:
+                    log(f"WARNING: Invalid frame type or empty frame")
+                    await asyncio.sleep(0.1)
+                    continue
                 
-                # Build vision data object
-                vision_data = VisionData(
-                    timestamp=time.time(),
-                    frame_id=frame_count,
-                    raw_frame=frame,
-                    ball=ball,
-                    blue_goal=blue_goal,
-                    yellow_goal=yellow_goal
-                )
+                try:
+                    # Run detections (detections expect RGB input)
+                    ball = self.camera.detect_ball(frame)
+                    blue_goal, yellow_goal = self.camera.detect_goals(frame)
+                    
+                    # Build vision data object
+                    vision_data = VisionData(
+                        timestamp=time.time(),
+                        frame_id=frame_count,
+                        raw_frame=frame,
+                        ball=ball,
+                        blue_goal=blue_goal,
+                        yellow_goal=yellow_goal
+                    )
+                    
+                    # Add debug overlays safely
+                    # add_debug_overlays expects RGB and returns BGR
+                    debug_frame = add_debug_overlays(frame, vision_data)
+                    
+                except Exception as e:
+                    log(f"ERROR in detection/overlay: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    # Fall back to plain frame
+                    # Ensure it's in BGR for encoding
+                    if len(frame.shape) == 3 and frame.shape[2] == 3:
+                        debug_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    else:
+                        debug_frame = frame
                 
-                # Add debug overlays (ball circles, goal boxes, labels, frame ID)
-                debug_frame = add_debug_overlays(frame, vision_data)
-                
-                # Encode to JPEG
-                _, buffer = cv2.imencode('.jpg', debug_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                
-                # Send as multipart
-                await response.write(
-                    b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + 
-                    buffer.tobytes() + 
-                    b'\r\n'
-                )
+                try:
+                    # Encode to JPEG (expects BGR)
+                    _, buffer = cv2.imencode('.jpg', debug_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    
+                    # Send as multipart
+                    await response.write(
+                        b'--frame\r\n'
+                        b'Content-Type: image/jpeg\r\n\r\n' + 
+                        buffer.tobytes() + 
+                        b'\r\n'
+                    )
+                except Exception as e:
+                    log(f"ERROR encoding/sending frame: {e}")
+                    await asyncio.sleep(0.1)
+                    continue
                 
                 frame_count += 1
                 if frame_count % 100 == 0:
-                    fps = int(1.0 / (time.time() - start_time))
-                    detections = []
-                    if vision_data.ball.detected:
-                        detections.append(f"ball@({vision_data.ball.center_x},{vision_data.ball.center_y})")
-                    if vision_data.blue_goal.detected:
-                        detections.append(f"blue_goal")
-                    if vision_data.yellow_goal.detected:
-                        detections.append(f"yellow_goal")
-                    det_str = ", ".join(detections) if detections else "no detections"
-                    log(f"Streamed {frame_count} frames (~{fps} FPS) - {det_str}")
+                    fps = int(1.0 / max(time.time() - start_time, 0.001))
+                    try:
+                        detections = []
+                        if vision_data.ball.detected:
+                            detections.append(f"ball@({vision_data.ball.center_x},{vision_data.ball.center_y})")
+                        if vision_data.blue_goal.detected:
+                            detections.append(f"blue_goal")
+                        if vision_data.yellow_goal.detected:
+                            detections.append(f"yellow_goal")
+                        det_str = ", ".join(detections) if detections else "no detections"
+                        log(f"Streamed {frame_count} frames (~{fps} FPS) - {det_str}")
+                    except:
+                        log(f"Streamed {frame_count} frames (~{fps} FPS)")
                 
                 # Limit to ~30 FPS
                 elapsed = time.time() - start_time
@@ -109,6 +142,8 @@ class CameraStreamer:
             log(f"Client disconnected: {request.remote}")
         except Exception as e:
             log(f"ERROR in stream: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             await response.write_eof()
         

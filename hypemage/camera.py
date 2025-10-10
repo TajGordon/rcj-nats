@@ -521,52 +521,100 @@ def add_debug_overlays(frame: np.ndarray, vision_data: VisionData) -> np.ndarray
     Returns:
         Frame with overlays drawn (BGR for display)
     """
+    # Validate input
+    if frame is None or frame.size == 0:
+        return frame
+    
+    # Get frame dimensions for bounds checking
+    frame_height, frame_width = frame.shape[:2]
+    
     # Convert RGB to BGR for OpenCV drawing
-    display_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    # Handle cases where frame might already be BGR or grayscale
+    if len(frame.shape) == 2:
+        # Grayscale - convert to BGR
+        display_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    elif frame.shape[2] == 4:
+        # RGBA - convert to BGR
+        display_frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+    elif frame.shape[2] == 3:
+        # Assume RGB, convert to BGR
+        display_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    else:
+        display_frame = frame.copy()
     
     # Draw ball detection
     if vision_data.ball.detected:
-        center = (vision_data.ball.center_x, vision_data.ball.center_y)
-        radius = vision_data.ball.radius
+        center_x = int(vision_data.ball.center_x)
+        center_y = int(vision_data.ball.center_y)
+        radius = int(vision_data.ball.radius)
         
-        # Draw circle around ball
-        cv2.circle(display_frame, center, radius, (0, 165, 255), 3)  # Orange circle
-        cv2.circle(display_frame, center, 5, (0, 0, 255), -1)  # Red center dot
-        
-        # Add label with position and radius
-        label = f"Ball: ({vision_data.ball.center_x}, {vision_data.ball.center_y}) r={radius}"
-        cv2.putText(display_frame, label, (center[0] - 80, center[1] - radius - 10),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+        # Bounds check
+        if 0 <= center_x < frame_width and 0 <= center_y < frame_height and radius > 0:
+            center = (center_x, center_y)
+            
+            # Draw circle around ball
+            cv2.circle(display_frame, center, radius, (0, 165, 255), 3)  # Orange circle
+            cv2.circle(display_frame, center, 5, (0, 0, 255), -1)  # Red center dot
+            
+            # Add label with position and radius - ensure text stays in bounds
+            label = f"Ball: ({center_x}, {center_y}) r={radius}"
+            text_x = max(10, center_x - 80)
+            text_y = max(30, center_y - radius - 10)
+            text_y = min(frame_height - 10, text_y)
+            cv2.putText(display_frame, label, (text_x, text_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
     
     # Draw blue goal detection
     if vision_data.blue_goal.detected:
-        x = vision_data.blue_goal.center_x - vision_data.blue_goal.width // 2
-        y = vision_data.blue_goal.center_y - vision_data.blue_goal.height // 2
-        w = vision_data.blue_goal.width
-        h = vision_data.blue_goal.height
+        center_x = int(vision_data.blue_goal.center_x)
+        center_y = int(vision_data.blue_goal.center_y)
+        width = int(vision_data.blue_goal.width)
+        height = int(vision_data.blue_goal.height)
         
-        # Draw rectangle around blue goal
-        cv2.rectangle(display_frame, (x, y), (x + w, y + h), (255, 0, 0), 3)  # Blue box
+        x = center_x - width // 2
+        y = center_y - height // 2
         
-        # Add label
-        label = f"Blue: ({vision_data.blue_goal.center_x}, {vision_data.blue_goal.center_y})"
-        cv2.putText(display_frame, label, (x, y - 10),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+        # Bounds check and clamp
+        x = max(0, min(x, frame_width - 1))
+        y = max(0, min(y, frame_height - 1))
+        w = min(width, frame_width - x)
+        h = min(height, frame_height - y)
+        
+        if w > 0 and h > 0:
+            # Draw rectangle around blue goal
+            cv2.rectangle(display_frame, (x, y), (x + w, y + h), (255, 0, 0), 3)  # Blue box
+            
+            # Add label - ensure text stays in bounds
+            label = f"Blue: ({center_x}, {center_y})"
+            text_y = max(20, y - 10)
+            cv2.putText(display_frame, label, (x, text_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
     
     # Draw yellow goal detection
     if vision_data.yellow_goal.detected:
-        x = vision_data.yellow_goal.center_x - vision_data.yellow_goal.width // 2
-        y = vision_data.yellow_goal.center_y - vision_data.yellow_goal.height // 2
-        w = vision_data.yellow_goal.width
-        h = vision_data.yellow_goal.height
+        center_x = int(vision_data.yellow_goal.center_x)
+        center_y = int(vision_data.yellow_goal.center_y)
+        width = int(vision_data.yellow_goal.width)
+        height = int(vision_data.yellow_goal.height)
         
-        # Draw rectangle around yellow goal
-        cv2.rectangle(display_frame, (x, y), (x + w, y + h), (0, 255, 255), 3)  # Yellow box
+        x = center_x - width // 2
+        y = center_y - height // 2
         
-        # Add label
-        label = f"Yellow: ({vision_data.yellow_goal.center_x}, {vision_data.yellow_goal.center_y})"
-        cv2.putText(display_frame, label, (x, y - 10),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        # Bounds check and clamp
+        x = max(0, min(x, frame_width - 1))
+        y = max(0, min(y, frame_height - 1))
+        w = min(width, frame_width - x)
+        h = min(height, frame_height - y)
+        
+        if w > 0 and h > 0:
+            # Draw rectangle around yellow goal
+            cv2.rectangle(display_frame, (x, y), (x + w, y + h), (0, 255, 255), 3)  # Yellow box
+            
+            # Add label - ensure text stays in bounds
+            label = f"Yellow: ({center_x}, {center_y})"
+            text_y = max(20, y - 10)
+            cv2.putText(display_frame, label, (x, text_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
     
     # Add frame ID
     frame_label = f"Frame: {vision_data.frame_id}"

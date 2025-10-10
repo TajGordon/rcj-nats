@@ -35,6 +35,9 @@ def draw_mirror_info(frame, camera_obj):
         cv2.line(display, (center_x - 20, center_y), (center_x + 20, center_y), (0, 255, 0), 1)
         cv2.line(display, (center_x, center_y - 20), (center_x, center_y + 20), (0, 255, 0), 1)
         
+        # Draw forward direction overlay
+        camera_obj.draw_forward_direction(display, center_x, center_y, radius)
+        
         info_text = f"Mirror: ({center_x}, {center_y}) r={radius}"
         cv2.putText(display, info_text, (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
@@ -64,6 +67,10 @@ async def websocket_handler(request):
                     camera.mirror_mask = None
                     camera.mirror_detection_counter = 0
                     await ws.send_json({'status': 'redetecting'})
+                elif data.get('type') == 'rotate':
+                    rotation = data.get('rotation', 0)
+                    camera.robot_forward_rotation = rotation
+                    await ws.send_json({'status': 'rotated', 'rotation': rotation})
     finally:
         active_connections.discard(ws)
     
@@ -156,11 +163,19 @@ async def index_handler(request):
             <strong>FPS:</strong> <span id="fps">0</span>
             <br>
             <strong>Mirror:</strong> <span id="mirror-info">N/A</span>
+            <br>
+            <strong>Crop:</strong> <span id="crop-info">N/A</span>
+            <br>
+            <strong>Forward Direction:</strong> <span id="rotation-info">0°</span>
         </div>
         
         <div class="controls">
             <button onclick="redetectMirror()">Re-detect Mirror</button>
             <button onclick="toggleView()">Toggle View</button>
+            <button onclick="rotateForward(0)">0°</button>
+            <button onclick="rotateForward(90)">90°</button>
+            <button onclick="rotateForward(180)">180°</button>
+            <button onclick="rotateForward(270)">270°</button>
         </div>
         
         <div class="frames">
@@ -169,7 +184,7 @@ async def index_handler(request):
                 <canvas id="original"></canvas>
             </div>
             <div class="frame-container">
-                <h3>Masked (Mirror Only)</h3>
+                <h3>Cropped to Mirror</h3>
                 <canvas id="masked"></canvas>
             </div>
         </div>
@@ -210,6 +225,16 @@ async def index_handler(request):
                         document.getElementById('mirror-info').textContent = 'NOT DETECTED';
                     }
                     
+                    if (data.crop_info) {
+                        document.getElementById('crop-info').textContent = data.crop_info;
+                    } else {
+                        document.getElementById('crop-info').textContent = 'N/A';
+                    }
+                    
+                    if (data.rotation_info) {
+                        document.getElementById('rotation-info').textContent = data.rotation_info;
+                    }
+                    
                     // Update FPS
                     frameCount++;
                     const now = Date.now();
@@ -238,6 +263,12 @@ async def index_handler(request):
         function redetectMirror() {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({type: 'redetect'}));
+            }
+        }
+
+        function rotateForward(degrees) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({type: 'rotate', rotation: degrees}));
             }
         }
 
@@ -273,16 +304,20 @@ async def frame_broadcaster():
             # Create original with overlay
             original = draw_mirror_info(frame, camera)
             
-            # Create masked version
-            masked = camera.apply_mirror_mask(frame)
+            # Create cropped version (mirror bounding box)
+            cropped = camera.crop_to_mirror(frame)
+            
+            # Draw forward direction on cropped frame too
+            cropped_with_overlay = cropped.copy()
+            camera.draw_forward_direction(cropped_with_overlay)
             
             # Encode frames as JPEG
             _, orig_jpg = cv2.imencode('.jpg', original, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            _, mask_jpg = cv2.imencode('.jpg', masked, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            _, crop_jpg = cv2.imencode('.jpg', cropped_with_overlay, [cv2.IMWRITE_JPEG_QUALITY, 80])
             
             # Convert to base64
             orig_b64 = base64.b64encode(orig_jpg).decode('utf-8')
-            mask_b64 = base64.b64encode(mask_jpg).decode('utf-8')
+            crop_b64 = base64.b64encode(crop_jpg).decode('utf-8')
             
             # Prepare mirror info
             mirror_info = None
@@ -290,10 +325,21 @@ async def frame_broadcaster():
                 cx, cy, r = camera.mirror_circle
                 mirror_info = f"({cx}, {cy}) radius={r}"
             
+            # Add crop region info
+            crop_info = None
+            if hasattr(camera, 'mirror_crop_region') and camera.mirror_crop_region:
+                x1, y1, x2, y2 = camera.mirror_crop_region
+                crop_info = f"Crop: ({x1},{y1}) to ({x2},{y2}), Size: {x2-x1}x{y2-y1}"
+            
+            # Add rotation info
+            rotation_info = f"{camera.robot_forward_rotation}°"
+            
             data = {
                 'frame_original': orig_b64,
-                'frame_masked': mask_b64,
-                'mirror_info': mirror_info
+                'frame_masked': crop_b64,
+                'mirror_info': mirror_info,
+                'crop_info': crop_info,
+                'rotation_info': rotation_info
             }
             
             # Broadcast to all connections

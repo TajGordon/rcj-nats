@@ -534,17 +534,17 @@ def add_debug_overlays(frame: np.ndarray, vision_data: VisionData) -> np.ndarray
     
     # Convert RGB to BGR for OpenCV drawing
     # Handle cases where frame might already be BGR or grayscale
-    if len(frame.shape) == 2:
-        # Grayscale - convert to BGR
-        display_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-    elif frame.shape[2] == 4:
-        # RGBA - convert to BGR
-        display_frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
-    elif frame.shape[2] == 3:
-        # Assume RGB, convert to BGR
-        display_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    else:
-        display_frame = frame.copy()
+    # if len(frame.shape) == 2:
+    #     # Grayscale - convert to BGR
+    #     # display_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+    # elif frame.shape[2] == 4:
+    #     # RGBA - convert to BGR
+    #     # display_frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+    # elif frame.shape[2] == 3:
+    #     # Assume RGB, convert to BGR
+    #     # display_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    # else:
+    display_frame = frame.copy()
     
     # Draw ball detection
     if vision_data.ball.detected:

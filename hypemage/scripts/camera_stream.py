@@ -1,7 +1,8 @@
 """
-Simple Camera Streamer - Streams raw camera feed via HTTP
+Standalone Camera Streamer with Debug Overlays
 
-This creates an HTTP server that streams MJPEG video to the dashboard.
+This creates an HTTP server that streams MJPEG video with detection overlays to the dashboard.
+Runs ball and goal detection on each frame and draws debug info (bounding boxes, labels, frame ID).
 
 Usage:
     python -m hypemage.scripts.camera_stream
@@ -14,7 +15,7 @@ import time
 import socket
 import sys
 
-from hypemage.camera import CameraProcess
+from hypemage.camera import CameraProcess, add_debug_overlays, VisionData, BallDetectionResult, GoalDetectionResult
 from hypemage.config import get_robot_id
 
 # Use print for logging since it will be captured by interface.py
@@ -36,7 +37,7 @@ def get_debug_port() -> int:
 class CameraStreamer:
     def __init__(self):
         self.robot_id = get_robot_id()
-        self.camera = None
+        self.camera: CameraProcess | None = None
         
     async def mjpeg_handler(self, request):
         """Handle MJPEG stream requests"""
@@ -51,14 +52,32 @@ class CameraStreamer:
             while True:
                 start_time = time.time()
                 
-                # Capture frame
+                # Capture frame from camera
                 frame = self.camera.capture_frame()
+                
                 if frame is None:
                     await asyncio.sleep(0.1)
                     continue
                 
+                # Run detections
+                ball = self.camera.detect_ball(frame)
+                blue_goal, yellow_goal = self.camera.detect_goals(frame)
+                
+                # Build vision data object
+                vision_data = VisionData(
+                    timestamp=time.time(),
+                    frame_id=frame_count,
+                    raw_frame=frame,
+                    ball=ball,
+                    blue_goal=blue_goal,
+                    yellow_goal=yellow_goal
+                )
+                
+                # Add debug overlays (ball circles, goal boxes, labels, frame ID)
+                debug_frame = add_debug_overlays(frame, vision_data)
+                
                 # Encode to JPEG
-                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                _, buffer = cv2.imencode('.jpg', debug_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 
                 # Send as multipart
                 await response.write(
@@ -71,7 +90,15 @@ class CameraStreamer:
                 frame_count += 1
                 if frame_count % 100 == 0:
                     fps = int(1.0 / (time.time() - start_time))
-                    log(f"Streamed {frame_count} frames (~{fps} FPS)")
+                    detections = []
+                    if vision_data.ball.detected:
+                        detections.append(f"ball@({vision_data.ball.center_x},{vision_data.ball.center_y})")
+                    if vision_data.blue_goal.detected:
+                        detections.append(f"blue_goal")
+                    if vision_data.yellow_goal.detected:
+                        detections.append(f"yellow_goal")
+                    det_str = ", ".join(detections) if detections else "no detections"
+                    log(f"Streamed {frame_count} frames (~{fps} FPS) - {det_str}")
                 
                 # Limit to ~30 FPS
                 elapsed = time.time() - start_time

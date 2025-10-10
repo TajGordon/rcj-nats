@@ -79,11 +79,30 @@
     "_comment_command_mode": "12 = Speed mode",
     "watchdog_enabled": true,
     "watchdog_timeout": 0.5,
-    "_comment_watchdog": "Auto-stop motors if no commands for 0.5 seconds"
+    "_comment_watchdog": "Auto-stop motors if no commands for 0.5 seconds",
+    
+    "dribbler": {
+      "_comment": "Dribbler motor control (address auto-detected by hostname)",
+      "default_speed": 0.5,
+      "max_speed": 1.0
+    },
+    
+    "kicker": {
+      "_comment": "Kicker solenoid control",
+      "kick_duration": 0.15,
+      "_comment_duration": "Duration of kick pulse in seconds",
+      "gpio_pin": "D16",
+      "_comment_gpio": "GPIO pin for kicker relay (board.D16)"
+    }
   },
   
   "storm": {
     "_comment": "Storm-specific configuration (f7.local, port 8080)",
+    
+    "dribbler": {
+      "address": 29,
+      "_comment": "Dribbler motor I2C address for f7 (storm)"
+    },
     
     "hsv_ranges": {
       "ball": {
@@ -113,6 +132,11 @@
   
   "necron": {
     "_comment": "Necron-specific configuration (m7.local, port 8081)",
+    
+    "dribbler": {
+      "address": 30,
+      "_comment": "Dribbler motor I2C address for m7 (necron)"
+    },
     
     "hsv_ranges": {
       "ball": {

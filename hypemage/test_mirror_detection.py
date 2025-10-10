@@ -156,6 +156,8 @@ async def index_handler(request):
             <strong>FPS:</strong> <span id="fps">0</span>
             <br>
             <strong>Mirror:</strong> <span id="mirror-info">N/A</span>
+            <br>
+            <strong>Crop:</strong> <span id="crop-info">N/A</span>
         </div>
         
         <div class="controls">
@@ -169,7 +171,7 @@ async def index_handler(request):
                 <canvas id="original"></canvas>
             </div>
             <div class="frame-container">
-                <h3>Masked (Mirror Only)</h3>
+                <h3>Cropped to Mirror</h3>
                 <canvas id="masked"></canvas>
             </div>
         </div>
@@ -208,6 +210,12 @@ async def index_handler(request):
                         document.getElementById('mirror-info').textContent = data.mirror_info;
                     } else {
                         document.getElementById('mirror-info').textContent = 'NOT DETECTED';
+                    }
+                    
+                    if (data.crop_info) {
+                        document.getElementById('crop-info').textContent = data.crop_info;
+                    } else {
+                        document.getElementById('crop-info').textContent = 'N/A';
                     }
                     
                     // Update FPS
@@ -273,16 +281,16 @@ async def frame_broadcaster():
             # Create original with overlay
             original = draw_mirror_info(frame, camera)
             
-            # Create masked version
-            masked = camera.apply_mirror_mask(frame)
+            # Create cropped version (mirror bounding box)
+            cropped = camera.crop_to_mirror(frame)
             
             # Encode frames as JPEG
             _, orig_jpg = cv2.imencode('.jpg', original, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            _, mask_jpg = cv2.imencode('.jpg', masked, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            _, crop_jpg = cv2.imencode('.jpg', cropped, [cv2.IMWRITE_JPEG_QUALITY, 80])
             
             # Convert to base64
             orig_b64 = base64.b64encode(orig_jpg).decode('utf-8')
-            mask_b64 = base64.b64encode(mask_jpg).decode('utf-8')
+            crop_b64 = base64.b64encode(crop_jpg).decode('utf-8')
             
             # Prepare mirror info
             mirror_info = None
@@ -290,10 +298,17 @@ async def frame_broadcaster():
                 cx, cy, r = camera.mirror_circle
                 mirror_info = f"({cx}, {cy}) radius={r}"
             
+            # Add crop region info
+            crop_info = None
+            if hasattr(camera, 'mirror_crop_region') and camera.mirror_crop_region:
+                x1, y1, x2, y2 = camera.mirror_crop_region
+                crop_info = f"Crop: ({x1},{y1}) to ({x2},{y2}), Size: {x2-x1}x{y2-y1}"
+            
             data = {
                 'frame_original': orig_b64,
-                'frame_masked': mask_b64,
-                'mirror_info': mirror_info
+                'frame_masked': crop_b64,
+                'mirror_info': mirror_info,
+                'crop_info': crop_info
             }
             
             # Broadcast to all connections

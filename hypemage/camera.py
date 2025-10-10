@@ -218,6 +218,7 @@ class CameraProcess:
         # Detected mirror properties (updated each frame or cached)
         self.mirror_circle = None  # (center_x, center_y, radius)
         self.mirror_mask = None  # Binary mask for the mirror area
+        self.mirror_crop_region = None  # (x1, y1, x2, y2) bounding box for cropping
         self.mirror_detection_interval = mirror_cfg.get('detection_interval', 30)  # Detect every N frames
         self.mirror_detection_counter = 0
         
@@ -379,13 +380,29 @@ class CameraProcess:
                 self.mirror_circle = detected_circle
                 center_x, center_y, radius = detected_circle
                 
-                # Create a binary mask for the mirror area
-                # The mask is white (255) inside the circle, black (0) outside
+                # Calculate crop region (bounding box around circle)
+                # Ensure we don't go out of frame bounds
                 height, width = frame.shape[:2]
+                x1 = max(0, center_x - radius)
+                y1 = max(0, center_y - radius)
+                x2 = min(width, center_x + radius)
+                y2 = min(height, center_y + radius)
+                
+                # Store crop region
+                self.mirror_crop_region = (x1, y1, x2, y2)
+                
+                # Calculate new frame center (relative to cropped region)
+                # The mirror center becomes the center of the cropped frame
+                self.frame_center_x = center_x - x1
+                self.frame_center_y = center_y - y1
+                
+                # Create a binary mask for the mirror area (in original frame coordinates)
+                # The mask is white (255) inside the circle, black (0) outside
                 self.mirror_mask = np.zeros((height, width), dtype=np.uint8)
                 cv2.circle(self.mirror_mask, (center_x, center_y), radius, 255, -1)
                 
-                logger.info(f"Mirror mask updated: center=({center_x}, {center_y}), radius={radius}")
+                logger.info(f"Mirror updated: center=({center_x}, {center_y}), radius={radius}, "
+                          f"crop=({x1},{y1},{x2},{y2}), new_frame_center=({self.frame_center_x}, {self.frame_center_y})")
             else:
                 # Mirror not detected, use fallback circular mask
                 if self.mirror_mask is None:
@@ -394,9 +411,30 @@ class CameraProcess:
                     cv2.circle(self.mirror_mask, 
                              (self.mask_center_x, self.mask_center_y), 
                              self.mask_radius, 255, -1)
+                    
+                    # Set default crop region (no crop)
+                    self.mirror_crop_region = (0, 0, width, height)
+                    
                     logger.warning(f"Mirror not detected, using fallback mask: "
                                  f"center=({self.mask_center_x}, {self.mask_center_y}), "
                                  f"radius={self.mask_radius}")
+    
+    def crop_to_mirror(self, image):
+        """
+        Crop image to the mirror bounding box
+        
+        Args:
+            image: Input image to crop
+            
+        Returns:
+            Cropped image (bounding box around mirror circle)
+        """
+        if not hasattr(self, 'mirror_crop_region') or self.mirror_crop_region is None:
+            logger.warning("Mirror crop region not set, returning original image")
+            return image
+        
+        x1, y1, x2, y2 = self.mirror_crop_region
+        return image[y1:y2, x1:x2]
     
     def apply_mirror_mask(self, image):
         """
@@ -433,14 +471,14 @@ class CameraProcess:
         # Update mirror mask if needed
         self.update_mirror_mask(frame)
         
-        # Convert to HSV (Picamera2 returns BGR format)
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        # Crop frame to mirror bounding box
+        cropped_frame = self.crop_to_mirror(frame)
         
-        # Apply mirror mask to HSV frame to only process the mirror area
-        hsv_masked = self.apply_mirror_mask(hsv)
+        # Convert to HSV (Picamera2 returns BGR format)
+        hsv = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2HSV)
         
         # Create color mask for orange ball
-        mask = cv2.inRange(hsv_masked, self.lower_orange, self.upper_orange)
+        mask = cv2.inRange(hsv, self.lower_orange, self.upper_orange)
         
         # Find contours in the masked region
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -473,6 +511,8 @@ class CameraProcess:
             return BallDetectionResult(detected=False)
         
         # Calculate proximity info
+        # Note: center_x and center_y are now relative to the CROPPED frame
+        # frame_center_x and frame_center_y are the mirror center in cropped coordinates
         ball_area = math.pi * radius * radius
         horizontal_error = (center_x - self.frame_center_x) / self.frame_center_x
         vertical_error = (center_y - self.frame_center_y) / self.frame_center_y
@@ -508,14 +548,14 @@ class CameraProcess:
         # Update mirror mask if needed (will be cached if already done this frame)
         self.update_mirror_mask(frame)
         
+        # Crop frame to mirror bounding box
+        cropped_frame = self.crop_to_mirror(frame)
+        
         # Convert to HSV (Picamera2 returns BGR format)
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2HSV)
         
-        # Apply mirror mask to HSV frame
-        hsv_masked = self.apply_mirror_mask(hsv)
-        
-        blue_result = self._detect_single_goal(hsv_masked, self.blue_goal_config)
-        yellow_result = self._detect_single_goal(hsv_masked, self.yellow_goal_config)
+        blue_result = self._detect_single_goal(hsv, self.blue_goal_config)
+        yellow_result = self._detect_single_goal(hsv, self.yellow_goal_config)
         
         return blue_result, yellow_result
     

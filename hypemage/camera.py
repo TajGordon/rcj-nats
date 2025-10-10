@@ -176,13 +176,17 @@ class CameraProcess:
             'lower': self.lower_blue.tolist(),
             'upper': self.upper_blue.tolist(),
             'min_contour_area': self.min_blue_area,
-            'max_contour_area': self.max_blue_area
+            'max_contour_area': self.max_blue_area,
+            'aspect_ratio_min': 0.3,  # Goals are typically wider than tall
+            'aspect_ratio_max': 5.0   # But not extremely wide
         }
         self.yellow_goal_config = {
             'lower': self.lower_yellow.tolist(),
             'upper': self.upper_yellow.tolist(),
             'min_contour_area': self.min_yellow_area,
-            'max_contour_area': self.max_yellow_area
+            'max_contour_area': self.max_yellow_area,
+            'aspect_ratio_min': 0.3,
+            'aspect_ratio_max': 5.0
         }
         self.goal_detection_params = {
             'min_goal_width': 20,

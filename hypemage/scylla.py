@@ -820,6 +820,15 @@ class Scylla:
             logger.warning("No motor controller - cannot move straight")
             return
         
+        # Check for button input to stop
+        if self.latest_button_input:
+            action = self.latest_button_input.get('action')
+            if action in ['emergency_stop', 'pause', 'toggle_mode']:
+                logger.info("Button pressed - stopping straight line movement")
+                self.motor_controller.stop()
+                self.transition_to(State.STOPPED)
+                return
+        
         # Move forward
         forward_speed = 0.05
         self.motor_controller.move_robot_relative(

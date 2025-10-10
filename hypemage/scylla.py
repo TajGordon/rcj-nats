@@ -17,6 +17,8 @@ from enum import Enum, auto
 import time
 import sys
 import math
+import atexit
+import signal
 
 from hypemage.logger import get_logger
 from hypemage.motor_control import MotorController, MotorInitializationError
@@ -180,6 +182,46 @@ class Scylla:
         self._init_queues()
         self._init_events()
         self._init_critical_components()
+        
+        # Register emergency shutdown handlers
+        self._register_shutdown_handlers()
+    
+    def _register_shutdown_handlers(self):
+        """
+        Register handlers to ensure motors stop on any exit condition
+        
+        This provides multiple layers of safety:
+        - atexit: Called on normal Python exit
+        - SIGINT: Ctrl+C (handled in main loop)
+        - SIGTERM: Kill signal
+        """
+        # Register atexit handler (called on normal exit)
+        atexit.register(self._emergency_motor_stop)
+        
+        # Register SIGTERM handler (kill signal)
+        def sigterm_handler(signum, frame):
+            logger.warning(f"SIGTERM received - initiating shutdown")
+            self._emergency_motor_stop()
+            sys.exit(0)
+        
+        signal.signal(signal.SIGTERM, sigterm_handler)
+        
+        logger.info("Emergency shutdown handlers registered")
+    
+    def _emergency_motor_stop(self):
+        """
+        Emergency motor stop - called by atexit and signal handlers
+        
+        This is a failsafe to ensure motors always stop, even on crashes.
+        It's safe to call multiple times.
+        """
+        if hasattr(self, 'motor_controller') and self.motor_controller:
+            try:
+                self.motor_controller.stop()
+                logger.debug("Emergency motor stop executed")
+            except Exception as e:
+                # Don't let exceptions here crash the shutdown process
+                logger.error(f"Emergency motor stop failed: {e}")
     
     def _init_critical_components(self):
         """
@@ -238,7 +280,11 @@ class Scylla:
             while not self.events['stop'].is_set():
                 self._update()
         except KeyboardInterrupt:
-            print("Scylla interrupted by user")
+            print("\nScylla interrupted by user (Ctrl+C)")
+            logger.info("Keyboard interrupt received - initiating shutdown")
+        except Exception as e:
+            print(f"\n❌ FATAL ERROR: {e}")
+            logger.critical(f"Unhandled exception in main loop: {e}", exc_info=True)
         finally:
             self.shutdown()
     
@@ -255,36 +301,49 @@ class Scylla:
     
     def _update(self):
         """Main update loop - runs every iteration"""
-        current_time = time.time()
-        state_cfg = self.STATE_CONFIGS[self.current_state]
-        
-        # Calculate target delta based on state's update rate
-        target_dt = 1.0 / state_cfg.update_rate_hz
-        
-        # Check if enough time has passed for this state's update rate
-        if current_time - self.last_update_time < target_dt:
-            time.sleep(0.001)  # small sleep to avoid busy-wait
-            return
-        
-        self.last_update_time = current_time
-        
-        # Manage resources based on current state needs
-        self._manage_resources(state_cfg)
-        
-        # Gather sensor data if state needs it
-        if state_cfg.needs_camera:
-            self._poll_camera_data()
-        
-        if state_cfg.needs_localization:
-            self._poll_localization_data()
-        
-        # Always poll button input (for emergency stop, pause, etc.)
-        self._poll_button_input()
-        
-        # Dispatch to current state handler
-        state_handler = self._get_state_handler(self.current_state)
-        if state_handler:
-            state_handler()
+        try:
+            current_time = time.time()
+            state_cfg = self.STATE_CONFIGS[self.current_state]
+            
+            # Calculate target delta based on state's update rate
+            target_dt = 1.0 / state_cfg.update_rate_hz
+            
+            # Check if enough time has passed for this state's update rate
+            if current_time - self.last_update_time < target_dt:
+                time.sleep(0.001)  # small sleep to avoid busy-wait
+                return
+            
+            self.last_update_time = current_time
+            
+            # Manage resources based on current state needs
+            self._manage_resources(state_cfg)
+            
+            # Gather sensor data if state needs it
+            if state_cfg.needs_camera:
+                self._poll_camera_data()
+            
+            if state_cfg.needs_localization:
+                self._poll_localization_data()
+            
+            # Always poll button input (for emergency stop, pause, etc.)
+            self._poll_button_input()
+            
+            # Dispatch to current state handler
+            state_handler = self._get_state_handler(self.current_state)
+            if state_handler:
+                state_handler()
+        except Exception as e:
+            # Catch any exception in state handlers or update loop
+            logger.error(f"Error in _update() for state {self.current_state.name}: {e}", exc_info=True)
+            # Stop motors immediately for safety
+            if self.motor_controller:
+                try:
+                    self.motor_controller.stop()
+                    logger.info("Motors stopped due to error")
+                except:
+                    pass
+            # Re-raise to trigger main loop exception handler
+            raise
     
     def _manage_resources(self, state_cfg: StateConfig):
         """Start/stop processes based on state needs"""
@@ -948,12 +1007,28 @@ class Scylla:
     # ==================== CLEANUP ====================
     
     def shutdown(self):
-        """Clean shutdown of all processes"""
-        print("Shutting down Scylla...")
+        """
+        Clean shutdown of all processes and hardware
+        
+        CRITICAL: Always stops motors first to ensure robot safety
+        """
+        print("\n🛑 Shutting down Scylla...")
+        
+        # CRITICAL: Stop motors immediately for safety
+        if self.motor_controller:
+            try:
+                logger.info("Stopping motors...")
+                self.motor_controller.stop()
+                print("✓ Motors stopped")
+            except Exception as e:
+                logger.error(f"Failed to stop motors during shutdown: {e}")
+                print(f"⚠️  Warning: Motor stop failed: {e}")
         
         # Stop button thread
         if hasattr(self, 'button_stop_evt'):
             self.button_stop_evt.set()
+            if hasattr(self, 'button_thread'):
+                self.button_thread.join(timeout=1)
         
         # Stop all processes
         self._stop_camera_process()
@@ -964,11 +1039,15 @@ class Scylla:
         
         # Join any remaining processes
         for name, proc in self.processes.items():
-            proc.join(timeout=1)
-            if proc.is_alive():
-                proc.terminate()
+            try:
+                proc.join(timeout=1)
+                if proc.is_alive():
+                    logger.warning(f"Process {name} didn't stop cleanly, terminating...")
+                    proc.terminate()
+            except Exception as e:
+                logger.error(f"Error stopping process {name}: {e}")
         
-        print("Scylla shutdown complete")
+        print("✓ Scylla shutdown complete")
 
 
 if __name__ == '__main__':

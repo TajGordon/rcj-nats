@@ -27,7 +27,39 @@
     "motor_addresses": [26, 27, 29, 25],
     "_comment_motor_addresses": "Default motor I2C addresses (can be overridden per robot)",
     "motor_multipliers": [1.0, 1.0, 1.0, 1.0],
-    "_comment_motor_multipliers": "Default motor direction multipliers (1.0 = normal, -1.0 = reversed)"
+    "_comment_motor_multipliers": "Default motor direction multipliers (1.0 = normal, -1.0 = reversed)",
+    "max_speed": 400000000,
+    "_comment_max_speed": "Maximum motor speed in encoder units",
+    "current_limit_foc": 196608,
+    "_comment_current_limit_foc": "FOC current limit (65536 * 3)",
+    "id_pid": {
+      "kp": 1500,
+      "ki": 200
+    },
+    "iq_pid": {
+      "kp": 1500,
+      "ki": 200
+    },
+    "speed_pid": {
+      "kp": 0.04,
+      "ki": 0.0004,
+      "kd": 0.03
+    },
+    "position_pid": {
+      "kp": 275,
+      "ki": 0,
+      "kd": 0
+    },
+    "position_region_boundary": 250000,
+    "operating_mode": 3,
+    "_comment_operating_mode": "3 = FOC mode",
+    "sensor_mode": 1,
+    "_comment_sensor_mode": "1 = Sin/cos encoder",
+    "command_mode": 12,
+    "_comment_command_mode": "12 = Speed mode",
+    "watchdog_enabled": true,
+    "watchdog_timeout": 0.5,
+    "_comment_watchdog": "Auto-stop motors if no commands for 0.5 seconds"
   },
   
   "storm": {

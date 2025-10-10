@@ -93,6 +93,12 @@ class VisionData:
     yellow_goal: GoalDetectionResult = field(default_factory=GoalDetectionResult)
     frame_bytes: Optional[bytes] = None  # compressed JPEG if requested
     raw_frame: Optional[np.ndarray] = None  # only if explicitly requested
+    frame_center_x: int = 320  # Frame center X coordinate
+    frame_center_y: int = 320  # Frame center Y coordinate
+    mirror_detected: bool = False  # Whether mirror circle was detected
+    mirror_center_x: Optional[int] = None  # Mirror center X if detected
+    mirror_center_y: Optional[int] = None  # Mirror center Y if detected
+    mirror_radius: Optional[int] = None  # Mirror radius if detected
 
 
 class CameraProcess:
@@ -661,11 +667,21 @@ def camera_start(cmd_q, out_q, stop_evt, config=None):
                 time.sleep(0.01)
                 continue
             
-            # Create vision data
+            # Create vision data with frame and mirror info
             vision_data = VisionData(
                 timestamp=time.time(),
-                frame_id=camera.frame_counter
+                frame_id=camera.frame_counter,
+                frame_center_x=camera.frame_center_x,
+                frame_center_y=camera.frame_center_y
             )
+            
+            # Add mirror detection info if available
+            if camera.mirror_circle is not None:
+                vision_data.mirror_detected = True
+                vision_data.mirror_center_x = camera.mirror_circle[0]
+                vision_data.mirror_center_y = camera.mirror_circle[1]
+                vision_data.mirror_radius = camera.mirror_circle[2]
+            
             camera.frame_counter += 1
             
             # Process based on command or default behavior

@@ -210,13 +210,13 @@ class CameraProcess:
         """Set camera focus to manual mode with optimal lens position"""
         if _HAS_PICAMERA and hasattr(self, 'picam2'):
             try:
-                # Set manual focus mode with lens position 20.0 (optimal for soccer field)
+                # Set manual focus mode with lens position 18.0 (optimal for soccer field)
                 self.picam2.set_controls({
                     'AfMode': controls.AfModeEnum.Manual, 
-                    'LensPosition': 20.0
+                    'LensPosition': 18.0
                 })
                 time.sleep(2)  # Allow time for focus adjustment
-                logger.info("Camera focus set to manual mode with lens position 20.0")
+                logger.info("Camera focus set to manual mode with lens position 18.0")
             except Exception as e:
                 logger.warning(f"Failed to set camera focus: {e}")
     

@@ -1,102 +1,110 @@
-# HSV Values - Before vs After
+# HSV Values - Current Configuration
 
-## Summary of Changes
+## Current HSV Values in Use
 
-| Color | Parameter | OLD Value | NEW Value | Change |
-|-------|-----------|-----------|-----------|--------|
-| **Ball (Orange)** | H min | 10 | 0 | More red tones |
-| | H max | 20 | 4 | Much narrower range |
-| | S min | 100 | 222 | Much more saturated |
-| | S max | 255 | 255 | (no change) |
-| | V min | 100 | 144 | Brighter minimum |
-| | V max | 255 | 255 | (no change) |
-| **Blue Goal** | H min | 100 | 92 | Slightly wider |
-| | H max | 120 | 110 | Narrower range |
-| | S min | 150 | 242 | Much more saturated |
-| | S max | 255 | 255 | (no change) |
-| | V min | 50 | 155 | Much brighter minimum |
-| | V max | 255 | 236 | Filters highlights |
-| **Yellow Goal** | H min | 20 | 14 | More orange-yellow |
-| | H max | 40 | 23 | Much narrower range |
-| | S min | 100 | 202 | Much more saturated |
-| | S max | 255 | 255 | (no change) |
-| | V min | 100 | 97 | Slightly darker allowed |
-| | V max | 255 | 177 | Filters bright spots |
+| Robot | Color | Parameter | Current Value | Notes |
+|-------|-------|-----------|---------------|-------|
+| **Storm** | **Ball (Orange)** | H min | 0 | Red-orange range |
+| | | H max | 20 | Wide orange range |
+| | | S min | 140 | Moderate saturation |
+| | | S max | 255 | Full saturation |
+| | | V min | 150 | Bright minimum |
+| | | V max | 255 | Full brightness |
+| **Necron** | **Ball (Orange)** | H min | 0 | Red-orange range |
+| | | H max | 20 | Wide orange range |
+| | | S min | 100 | Lower saturation |
+| | | S max | 255 | Full saturation |
+| | | V min | 30 | Dark minimum |
+| | | V max | 255 | Full brightness |
+| **Both** | **Blue Goal** | H min | 100 | Blue range |
+| | | H max | 120 | Standard blue |
+| | | S min | 150 | Moderate saturation |
+| | | S max | 255 | Full saturation |
+| | | V min | 50 | Dark minimum |
+| | | V max | 255 | Full brightness |
+| **Both** | **Yellow Goal** | H min | 20 | Yellow range |
+| | | H max | 40 | Standard yellow |
+| | | S min | 100 | Moderate saturation |
+| | | S max | 255 | Full saturation |
+| | | V min | 100 | Bright minimum |
+| | | V max | 255 | Full brightness |
 
 ## Key Insights
 
 ### Ball Detection (Orange)
-- **Narrower Hue**: 4 degrees vs 10 degrees - Much more specific
-- **Higher Saturation**: 222 vs 100 - Only vibrant oranges
-- **Impact**: Fewer false positives, better precision
+- **Storm**: Higher saturation (140) and brightness (150) - Better for well-lit conditions
+- **Necron**: Lower saturation (100) and brightness (30) - Better for varied lighting
+- **Both**: Wide hue range (0-20) - Catches various orange shades
+- **Impact**: Different robots optimized for different lighting conditions
 
 ### Blue Goal
-- **Very High Saturation**: 242 minimum - Only pure blues
-- **Much Brighter**: 155 minimum vs 50 - No dark blue shadows
-- **Clamped Value**: 236 max - Removes glare/highlights
-- **Impact**: Better goal detection, less noise
+- **Standard Range**: 100-120 hue - Covers typical blue spectrum
+- **Moderate Saturation**: 150 minimum - Filters pale blues
+- **Low Brightness**: 50 minimum - Includes darker blues
+- **Impact**: Reliable blue goal detection across lighting
 
 ### Yellow Goal  
-- **Narrow Range**: 14-23 (9 degrees) vs 20-40 (20 degrees)
-- **High Saturation**: 202 minimum - Only vivid yellows
-- **Clamped Value**: 177 max - Removes bright spots
-- **Impact**: Precise yellow detection, less confusion with other colors
+- **Standard Range**: 20-40 hue - Covers yellow spectrum
+- **Moderate Saturation**: 100 minimum - Filters pale yellows
+- **High Brightness**: 100 minimum - Only bright yellows
+- **Impact**: Good yellow detection, may miss darker yellows
 
-## What This Fixes
+## Current Configuration Analysis
 
-### Before (Generic Values)
-- ⚠️ Detected pale/washed out colors as valid objects
-- ⚠️ Wide hue ranges caused cross-color detection
-- ⚠️ Low saturation allowed gray/brown false positives
-- ⚠️ Unclamped value included specular highlights
+### Storm Robot (Higher Performance)
+- ✅ Higher saturation (140) - Better color discrimination
+- ✅ Higher brightness (150) - Works well in good lighting
+- ✅ Wide hue range (0-20) - Catches various orange balls
+- ⚠️ May struggle in dim lighting
 
-### After (Calibrated Values)
-- ✅ Only detects vibrant, saturated colors
-- ✅ Narrow hue ranges = precise color matching
-- ✅ High saturation filters = noise rejection
-- ✅ Value clamping removes glare artifacts
+### Necron Robot (More Flexible)
+- ✅ Lower saturation (100) - Works in varied lighting
+- ✅ Lower brightness (30) - Detects balls in shadows
+- ✅ Same hue range (0-20) - Consistent ball detection
+- ⚠️ May have more false positives in bright conditions
 
 ## Visual Representation
 
 ### Ball - Orange Detection Range
 ```
-OLD: H=[10-20°] (10° range) 🟠🟡 (includes yellows)
-NEW: H=[0-4°]   (4° range)  🔴🟠 (pure orange/red-orange only)
+Storm:  H=[0-20°] (20° range) 🔴🟠🟡 (red-orange-yellow)
+        S=[140-255] (moderate to high saturation)
+        V=[150-255] (bright only)
 
-OLD: S=[100-255] (allows pale colors)
-NEW: S=[222-255] (only vibrant colors)
+Necron: H=[0-20°] (20° range) 🔴🟠🟡 (red-orange-yellow)  
+        S=[100-255] (low to high saturation)
+        V=[30-255] (dark to bright)
 ```
 
 ### Blue Goal Detection Range
 ```
-OLD: H=[100-120°] (20° range) 💙💜 (includes purple tint)
-NEW: H=[92-110°]  (18° range) 💙💙 (pure blue spectrum)
-
-OLD: V=[50-255] (includes dark blues and highlights)
-NEW: V=[155-236] (only bright, non-glare blues)
+Both:   H=[100-120°] (20° range) 💙💙 (standard blue)
+        S=[150-255] (moderate to high saturation)
+        V=[50-255] (dark to bright)
 ```
 
 ### Yellow Goal Detection Range
 ```
-OLD: H=[20-40°] (20° range) 🟡🟢 (includes greenish yellows)
-NEW: H=[14-23°] (9° range)  🟠🟡 (orange-yellow to pure yellow)
-
-OLD: V=[100-255] (includes highlights)
-NEW: V=[97-177] (filters bright spots)
+Both:   H=[20-40°] (20° range) 🟡🟡 (standard yellow)
+        S=[100-255] (moderate to high saturation)
+        V=[100-255] (bright only)
 ```
 
-## Recommendation
+## Current Status
 
-These new values are **competition-tested** from the nationals implementation. They should provide:
-- Better accuracy
-- Fewer false detections  
-- More consistent performance
-- Proven reliability
+These values are **currently in use** in the system and should work for:
+- ✅ Ball detection in various lighting conditions
+- ✅ Goal detection for both blue and yellow goals
+- ✅ Different robot configurations (Storm vs Necron)
 
-If detection still has issues, the problem is likely:
-1. Camera calibration (exposure, white balance)
-2. Physical lighting conditions
-3. Object positioning/occlusion
-4. Not the HSV ranges themselves
+### Robot-Specific Optimizations:
+- **Storm**: Optimized for bright, consistent lighting
+- **Necron**: Optimized for varied/dim lighting conditions
 
-The HSV ranges are now **correct** ✅
+### If Detection Issues Occur:
+1. **Lighting**: Check if lighting matches robot's optimization
+2. **Camera**: Verify camera exposure and white balance
+3. **Objects**: Ensure balls/goals are within detection ranges
+4. **Calibration**: Use camera calibration tools if needed
+
+The HSV ranges are **currently configured and functional** ✅

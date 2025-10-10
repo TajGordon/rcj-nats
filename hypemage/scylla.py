@@ -16,6 +16,7 @@ from multiprocessing import Process, Queue, Event, get_context
 from enum import Enum, auto
 import time
 import sys
+import math
 
 from hypemage.logger import get_logger
 from hypemage.motor_control import MotorController, MotorInitializationError
@@ -558,13 +559,52 @@ class Scylla:
         if ball.detected:
             print(f"Ball at ({ball.center_x}, {ball.center_y}), radius={ball.radius}")
             
-            # Example logic: if ball is close and centered, transition to lineup
+            # Check if ball is close and centered - transition to lineup
             if ball.is_close_and_centered:
                 self.transition_to(State.LINEUP_KICK)
+                return
+            
+            # Calculate angle to ball for movement
+            if self.motor_controller:
+                # Get frame dimensions from camera data
+                frame_center_x = self.latest_camera_data.frame_center_x
+                frame_center_y = self.latest_camera_data.frame_center_y
+                
+                # Calculate angle to ball using atan2
+                # Note: atan2(y, x) where y is vertical offset, x is horizontal offset
+                ball_angle = math.degrees(math.atan2(
+                    ball.center_x - frame_center_x,  # horizontal offset (left/right)
+                    frame_center_y - ball.center_y   # vertical offset (forward/back)
+                ))
+                
+                # Calculate speed based on ball distance (closer = slower for precision)
+                # Use ball area as proxy for distance (larger area = closer ball)
+                if ball.area > 1000:  # Ball is close
+                    speed = 0.3  # Slower for precision
+                elif ball.area > 500:  # Ball is medium distance
+                    speed = 0.5  # Medium speed
+                else:  # Ball is far
+                    speed = 0.7  # Faster to catch up
+                
+                # Add slight rotation to help with ball alignment
+                # If ball is off-center horizontally, add rotation
+                horizontal_error = ball.horizontal_error
+                if abs(horizontal_error) > 0.1:  # Ball is significantly off-center
+                    rotation = -horizontal_error * 0.3  # Proportional rotation
+                    rotation = max(-0.5, min(0.5, rotation))  # Clamp rotation
+                else:
+                    rotation = 0.0
+                
+                # Move towards ball
+                self.motor_controller.move_robot_relative(
+                    angle=ball_angle,
+                    speed=speed,
+                    rotation=rotation
+                )
+                
+                print(f"Chasing ball: angle={ball_angle:.1f}°, speed={speed:.2f}, rotation={rotation:.2f}")
             else:
-                # Send motor commands to chase ball
-                # self._send_motor_command(...)
-                pass
+                logger.warning("No motor controller available for ball chasing")
         else:
             # Lost ball - search
             self.transition_to(State.SEARCH_BALL)
@@ -592,10 +632,38 @@ class Scylla:
     def state_search_ball(self):
         """Ball lost - search pattern"""
         print("Searching for ball...")
-        # Rotate/move in search pattern
-        # If ball found, transition back to chase
+        
+        # Check if ball is found
         if self.latest_camera_data and self.latest_camera_data.ball.detected:
+            print("Ball found during search - transitioning to chase")
             self.transition_to(State.CHASE_BALL)
+            return
+        
+        # Perform search pattern if motor controller is available
+        if self.motor_controller:
+            # Initialize search state if not already done
+            if not hasattr(self, '_search_state_init'):
+                self._search_state_init = True
+                self._search_start_time = time.time()
+                self._search_direction = 1  # 1 for clockwise, -1 for counter-clockwise
+                print("Starting ball search pattern")
+            
+            # Rotate slowly to search for ball
+            search_speed = 0.2  # Slow rotation speed
+            self.motor_controller.move_robot_relative(
+                angle=0,  # No forward/back movement
+                speed=0,  # No translation
+                rotation=self._search_direction * search_speed  # Rotate to search
+            )
+            
+            # Change search direction every 3 seconds
+            search_duration = 3.0
+            if time.time() - self._search_start_time > search_duration:
+                self._search_direction *= -1  # Reverse direction
+                self._search_start_time = time.time()
+                print(f"Changing search direction to {'clockwise' if self._search_direction > 0 else 'counter-clockwise'}")
+        else:
+            logger.warning("No motor controller available for ball search")
     
     def state_lineup_kick(self):
         """Line up for a kick"""
@@ -699,6 +767,17 @@ class Scylla:
     def on_exit_chase_ball(self):
         """Called when exiting chase_ball state"""
         print("Exiting CHASE_BALL mode")
+    
+    def on_exit_search_ball(self):
+        """Called when exiting search_ball state"""
+        print("Exiting SEARCH_BALL mode")
+        # Clean up search state variables
+        if hasattr(self, '_search_state_init'):
+            delattr(self, '_search_state_init')
+        if hasattr(self, '_search_start_time'):
+            delattr(self, '_search_start_time')
+        if hasattr(self, '_search_direction'):
+            delattr(self, '_search_direction')
     
     def on_enter_stopped(self):
         """Called when entering stopped state"""

@@ -249,19 +249,19 @@ def get_default_config() -> Dict[str, Any]:
                 "lower": [0, 180, 170],
                 "upper": [50, 255, 255],
                 "min_area": 0,
-                "max_area": 50000
+                "max_area": 500
             },
             "blue_goal": {
                 "lower": [100, 150, 50],
                 "upper": [120, 255, 255],
                 "min_area": 500,
-                "max_area": 100000
+                "max_area": 1000
             },
             "yellow_goal": {
                 "lower": [20, 100, 100],
                 "upper": [40, 255, 255],
                 "min_area": 500,
-                "max_area": 100000
+                "max_area": 1000
             }
         },
         "detection": {

@@ -1,97 +1,75 @@
-# HSV Configuration Fix - Updated to Match Nationals
+# HSV Configuration - Current System Values
 
-## Problem
-The HSV color ranges in `hypemage/config.json` were using generic/placeholder values that didn't match the calibrated values from the nationals competition implementation.
+## Current Configuration
+The HSV color ranges in `hypemage/config.json` are currently configured with robot-specific values optimized for different lighting conditions.
 
-## Solution
-Updated `hypemage/config.json` to use the proven HSV ranges from `nationals/config.json`.
-
-## Changes Applied
+## Current Values in Use
 
 ### Ball (Orange) Detection
-**OLD (Generic values):**
+
+**Storm Robot:**
 ```json
-"lower": [10, 100, 100],
+"lower": [0, 140, 150],
 "upper": [20, 255, 255]
 ```
 
-**NEW (Calibrated values from nationals):**
+**Necron Robot:**
 ```json
-"lower": [0, 222, 144],
-"upper": [4, 255, 255]
+"lower": [0, 100, 30],
+"upper": [20, 255, 255]
 ```
 
 **Analysis:**
-- Much narrower Hue range (0-4 vs 10-20) - More precise orange detection
-- Much higher Saturation minimum (222 vs 100) - Filters out pale/washed out colors
-- Higher Value minimum (144 vs 100) - Filters out dark areas
+- **Storm**: Higher saturation (140) and brightness (150) - Optimized for bright lighting
+- **Necron**: Lower saturation (100) and brightness (30) - Optimized for varied/dim lighting
+- **Both**: Wide hue range (0-20) - Catches various orange ball shades
 
 ### Blue Goal Detection
-**OLD:**
+**Both Robots:**
 ```json
 "lower": [100, 150, 50],
 "upper": [120, 255, 255]
 ```
 
-**NEW:**
-```json
-"lower": [92, 242, 155],
-"upper": [110, 255, 236]
-```
-
 **Analysis:**
-- Slightly wider Hue range (92-110 vs 100-120)
-- Much higher Saturation minimum (242 vs 150) - Only very saturated blues
-- Much higher Value minimum (155 vs 50) - Only bright blues
-- Slightly lower Value maximum (236 vs 255) - Filters out specular highlights
+- Standard blue hue range (100-120) - Covers typical blue spectrum
+- Moderate saturation minimum (150) - Filters pale blues
+- Low brightness minimum (50) - Includes darker blues
+- Full brightness maximum (255) - Includes bright blues
 
 ### Yellow Goal Detection
-**OLD:**
+**Both Robots:**
 ```json
 "lower": [20, 100, 100],
 "upper": [40, 255, 255]
 ```
 
-**NEW:**
-```json
-"lower": [14, 202, 97],
-"upper": [23, 255, 177]
-```
-
 **Analysis:**
-- Narrower Hue range (14-23 vs 20-40) - More specific yellow
-- Much higher Saturation minimum (202 vs 100) - Only vibrant yellows
-- Lower Value maximum (177 vs 255) - Filters out bright highlights
+- Standard yellow hue range (20-40) - Covers yellow spectrum
+- Moderate saturation minimum (100) - Filters pale yellows
+- High brightness minimum (100) - Only bright yellows
+- Full brightness maximum (255) - Includes bright yellows
 
-## Format Comparison
+## Configuration Format
 
-### Nationals Format (Flat Array)
-```json
-"ball": [0, 222, 144, 4, 255, 255]
-```
-Loaded as:
-```python
-ColorRange(colours["ball"][:3], colours["ball"][3:])
-# lower = [0, 222, 144]
-# upper = [4, 255, 255]
-```
-
-### Hypemage Format (Nested Structure)
+### Current Hypemage Format (Nested Structure)
 ```json
 "ball": {
-  "lower": [0, 222, 144],
-  "upper": [4, 255, 255],
-  "min_area": 100,
-  "max_area": 50000
+  "lower": [0, 140, 150],
+  "upper": [20, 255, 255],
+  "min_area": 0,
+  "max_area": 500
 }
 ```
 Loaded as:
 ```python
-self.lower_orange = np.array(ball_cfg.get("lower", [0, 222, 144]))
-self.upper_orange = np.array(ball_cfg.get("upper", [4, 255, 255]))
+self.lower_orange = np.array(ball_cfg.get("lower", [0, 140, 150]))
+self.upper_orange = np.array(ball_cfg.get("upper", [20, 255, 255]))
 ```
 
-Both formats work correctly - hypemage just uses a more explicit nested structure with additional parameters (min_area, max_area).
+The format includes additional parameters:
+- `min_area`: Minimum contour area to filter noise
+- `max_area`: Maximum contour area to avoid huge objects
 
 ## HSV Color Space Quick Reference
 
@@ -112,43 +90,38 @@ Both formats work correctly - hypemage just uses a more explicit nested structur
 - 150-200: Bright
 - 255: Maximum brightness
 
-## Why These Values Matter
+## Why These Values Work
 
-The nationals config values are **calibrated** for the actual competition environment:
-- Specific lighting conditions
-- Actual ball/goal colors used in RoboCup Junior
-- Tested and refined through competition experience
+The current config values are **optimized** for different robot scenarios:
+- **Storm**: High-performance values for consistent lighting
+- **Necron**: Flexible values for varied lighting conditions
+- **Both**: Standard goal detection ranges
 
-The old generic values were likely causing:
-- ❌ Missing actual orange balls (too narrow hue range)
-- ❌ Detecting non-ball orange objects (too low saturation)
-- ❌ False positives from pale/washed colors
-- ❌ Missing goals in different lighting
-
-The new calibrated values provide:
-- ✅ Precise color matching
-- ✅ Better noise rejection (high saturation minimums)
-- ✅ Consistent detection across lighting variations
-- ✅ Proven in competition environment
+### Current Configuration Benefits:
+- ✅ **Storm**: Better precision in good lighting conditions
+- ✅ **Necron**: More robust detection in varied lighting
+- ✅ **Both**: Reliable goal detection across conditions
+- ✅ **Flexible**: Different robots optimized for different environments
 
 ## Testing Recommendations
 
-After updating config, test detection with:
+To verify current configuration works:
 
-1. **Actual game objects** - Real RCJ ball and goals
-2. **Different lighting** - Bright, normal, dim conditions
-3. **Different angles** - Ball/goals at various positions
-4. **Background noise** - Other colored objects in view
+1. **Test with actual RCJ balls and goals**
+2. **Test in different lighting conditions**:
+   - Storm: Test in bright, consistent lighting
+   - Necron: Test in varied/dim lighting
+3. **Test at different angles and distances**
+4. **Test with background noise** (other colored objects)
 
-Expected improvements:
-- More reliable ball detection
-- Fewer false positives
-- Better color discrimination
-- Consistent performance
+### Expected Performance:
+- **Storm**: High precision in good lighting
+- **Necron**: Robust detection in varied lighting
+- **Both**: Reliable goal detection
 
-## Future Calibration
+## Calibration Tools
 
-If you need to recalibrate for different environments:
+If you need to adjust values for different environments:
 
 1. Use the calibration script (if available)
 2. Capture sample images

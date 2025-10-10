@@ -23,6 +23,8 @@ import signal
 from hypemage.logger import get_logger
 from hypemage.motor_control import MotorController, MotorInitializationError
 from hypemage.camera import CameraProcess, CameraInitializationError
+from hypemage.dribbler_control import DribblerController
+from hypemage.kicker_control import KickerController
 
 logger = get_logger(__name__)
 
@@ -39,6 +41,8 @@ class ComponentStatus:
     goal_localizer: bool = False
     imu: bool = False
     tof_sensors: List[bool] = field(default_factory=lambda: [False]*4)
+    dribbler: bool = False
+    kicker: bool = False
     
     def all_critical_ok(self) -> bool:
         """Check if all critical components are working"""
@@ -47,7 +51,8 @@ class ComponentStatus:
     def summary(self) -> str:
         """Get status summary string"""
         critical = f"Motors: {'✓' if self.motors else '✗'}, Camera: {'✓' if self.camera else '✗'}"
-        non_critical = f"Localization: {'✓' if self.localization else '✗'}, GoalLocalizer: {'✓' if self.goal_localizer else '✗'}"
+        non_critical = f"Localization: {'✓' if self.localization else '✗'}, Dribbler: {'✓' if self.dribbler else '✗'}, Kicker: {'✓' if self.kicker else '✗'}"
+        return f"[CRITICAL: {critical}] [NON-CRITICAL: {non_critical}]"
         return f"[CRITICAL: {critical}] [NON-CRITICAL: {non_critical}]"
 
 
@@ -178,10 +183,15 @@ class Scylla:
         # Motor controller (critical - must init first)
         self.motor_controller = None
         
+        # Dribbler and kicker controllers (non-critical)
+        self.dribbler_controller = None
+        self.kicker_controller = None
+        
         # Initialize resources
         self._init_queues()
         self._init_events()
         self._init_critical_components()
+        self._init_non_critical_components()
         
         # Register emergency shutdown handlers
         self._register_shutdown_handlers()
@@ -222,6 +232,14 @@ class Scylla:
             except Exception as e:
                 # Don't let exceptions here crash the shutdown process
                 logger.error(f"Emergency motor stop failed: {e}")
+        
+        # Also stop dribbler
+        if hasattr(self, 'dribbler_controller') and self.dribbler_controller:
+            try:
+                self.dribbler_controller.stop()
+                logger.debug("Emergency dribbler stop executed")
+            except Exception as e:
+                logger.error(f"Emergency dribbler stop failed: {e}")
     
     def _init_critical_components(self):
         """
@@ -248,6 +266,46 @@ class Scylla:
             sys.exit(1)
         
         # Log component status
+        logger.info(f"Component status: {self.status.summary()}")
+    
+    def _init_non_critical_components(self):
+        """
+        Initialize non-critical components (dribbler, kicker)
+        Robot continues if these fail - they are not essential for basic operation
+        """
+        logger.info("Initializing non-critical components...")
+        
+        # Initialize dribbler (NON-CRITICAL)
+        try:
+            logger.info("Initializing dribbler controller...")
+            dribbler_config = self.config.get('dribbler', {})
+            # Auto-detect address based on hostname if not specified
+            dribbler_address = dribbler_config.get('address', None)
+            self.dribbler_controller = DribblerController(
+                address=dribbler_address,
+                threaded=True
+            )
+            self.status.dribbler = True
+            logger.info("✓ Dribbler controller initialized successfully")
+        except Exception as e:
+            logger.warning(f"⚠️  Dribbler initialization failed: {e}")
+            logger.warning("Robot will continue without dribbler")
+            self.dribbler_controller = None
+        
+        # Initialize kicker (NON-CRITICAL)
+        try:
+            logger.info("Initializing kicker controller...")
+            kicker_config = self.config.get('kicker', {})
+            kick_duration = kicker_config.get('kick_duration', 0.15)
+            self.kicker_controller = KickerController(kick_duration=kick_duration)
+            self.status.kicker = True
+            logger.info("✓ Kicker controller initialized successfully")
+        except Exception as e:
+            logger.warning(f"⚠️  Kicker initialization failed: {e}")
+            logger.warning("Robot will continue without kicker")
+            self.kicker_controller = None
+        
+        # Log updated component status
         logger.info(f"Component status: {self.status.summary()}")
     
     def _init_queues(self):
@@ -606,6 +664,74 @@ class Scylla:
         # Clear the backup after restoration
         self._pause_state_backup.clear()
     
+    # ==================== DRIBBLER & KICKER HELPERS ====================
+    
+    def set_dribbler_speed(self, speed: float):
+        """
+        Set dribbler motor speed
+        
+        Args:
+            speed: Speed value (-1.0 to 1.0)
+                  Positive = forward (pull ball in)
+                  Negative = reverse (push ball out)
+                  0 = stop
+        """
+        if self.dribbler_controller:
+            self.dribbler_controller.set_speed(speed)
+        else:
+            logger.warning("Dribbler controller not available")
+    
+    def enable_dribbler(self, speed: float = None):
+        """
+        Enable dribbler at configured or specified speed
+        
+        Args:
+            speed: Optional speed override (0.0 to 1.0)
+        """
+        if self.dribbler_controller:
+            if speed is None:
+                speed = self.config.get('dribbler', {}).get('default_speed', 0.5)
+            self.dribbler_controller.enable(speed)
+        else:
+            logger.warning("Dribbler controller not available")
+    
+    def disable_dribbler(self):
+        """Stop the dribbler motor"""
+        if self.dribbler_controller:
+            self.dribbler_controller.stop()
+        else:
+            logger.warning("Dribbler controller not available")
+    
+    def kick(self, duration: float = None) -> bool:
+        """
+        Trigger a kick
+        
+        Args:
+            duration: Optional kick duration override (seconds)
+        
+        Returns:
+            True if kick was triggered, False if failed or unavailable
+        """
+        if self.kicker_controller:
+            return self.kicker_controller.kick(duration)
+        else:
+            logger.warning("Kicker controller not available")
+            return False
+    
+    def can_kick(self) -> bool:
+        """
+        Check if robot can kick (cooldown expired)
+        
+        Returns:
+            True if kick is ready, False if still in cooldown or unavailable
+        """
+        if self.kicker_controller:
+            return self.kicker_controller.can_kick()
+        else:
+            return False
+    
+    # ==================== STATE TRANSITIONS ====================
+    
     def transition_to(self, new_state: State):
         """Transition to a new state with proper cleanup"""
         if new_state == self.current_state:
@@ -733,8 +859,24 @@ class Scylla:
                 # Ensure angle is in 0-360° range
                 ball_angle = ball_angle % 360
                 
-                # Use constant speed for ball chasing
-                speed = 0.05
+                # Calculate speed based on ball distance (closer = slower for precision)
+                # Use ball area as proxy for distance (larger area = closer ball)
+                # Typical ball areas might range from 100 (far) to 10000+ (very close)
+                if ball.area > 2000:  # Ball is very close
+                    speed = 0.25  # Very slow for precision
+                    dribbler_speed = 0.7  # High dribbler speed when close
+                elif ball.area > 1000:  # Ball is close
+                    speed = 0.4  # Moderate speed
+                    dribbler_speed = 0.6
+                elif ball.area > 500:  # Ball is medium distance
+                    speed = 0.6  # Medium-high speed
+                    dribbler_speed = 0.5
+                else:  # Ball is far
+                    speed = 0.8  # Fast to close distance
+                    dribbler_speed = 0.4  # Lower dribbler when far
+                
+                # Enable dribbler when chasing ball
+                self.enable_dribbler(dribbler_speed)
                 
                 # Proportional rotation control for better alignment
                 # The more the ball is off-center horizontally, the more we rotate
@@ -860,13 +1002,24 @@ class Scylla:
         
         ball = self.latest_camera_data.ball
         if ball.detected and ball.is_close_and_centered:
-            print("KICK!")
-            # Perform kick
-            # Then transition back to chase or attack
-            time.sleep(0.5)  # simulate kick
+            # Ball is in position - kick it!
+            if self.can_kick():
+                logger.info("⚽ Executing kick!")
+                if self.kick():
+                    logger.info("✓ Kick successful")
+                else:
+                    logger.warning("✗ Kick failed")
+                
+                # Brief delay to let ball leave
+                time.sleep(0.2)
+            else:
+                logger.info("Kick on cooldown, waiting...")
+            
+            # Transition back to chase after kick
             self.transition_to(State.CHASE_BALL)
         else:
             # Lost alignment, go back to chase
+            logger.info("Ball not aligned, returning to chase")
             self.transition_to(State.CHASE_BALL)
     
     def state_stopped(self):
@@ -972,6 +1125,9 @@ class Scylla:
         """Called when exiting chase_ball state"""
         logger.info("Exiting CHASE_BALL mode")
         
+        # Disable dribbler when exiting chase
+        self.disable_dribbler()
+        
         # Clean up tracking variables
         if hasattr(self, '_chase_last_ball_angle'):
             delattr(self, '_chase_last_ball_angle')
@@ -1028,6 +1184,30 @@ class Scylla:
                 logger.info("Stopping motors...")
                 self.motor_controller.stop()
                 print("✓ Motors stopped")
+            except Exception as e:
+                logger.error(f"Failed to stop motors during shutdown: {e}")
+                print(f"⚠️  Warning: Motor stop failed: {e}")
+        
+        # Stop dribbler
+        if self.dribbler_controller:
+            try:
+                logger.info("Stopping dribbler...")
+                self.dribbler_controller.stop()
+                self.dribbler_controller.stop_thread()
+                print("✓ Dribbler stopped")
+            except Exception as e:
+                logger.error(f"Failed to stop dribbler during shutdown: {e}")
+                print(f"⚠️  Warning: Dribbler stop failed: {e}")
+        
+        # Disable kicker
+        if self.kicker_controller:
+            try:
+                logger.info("Disabling kicker...")
+                self.kicker_controller.disable()
+                print("✓ Kicker disabled")
+            except Exception as e:
+                logger.error(f"Failed to disable kicker during shutdown: {e}")
+                print(f"⚠️  Warning: Kicker disable failed: {e}")
             except Exception as e:
                 logger.error(f"Failed to stop motors during shutdown: {e}")
                 print(f"⚠️  Warning: Motor stop failed: {e}")

@@ -188,6 +188,24 @@ class InterfaceServer:
         for ws in disconnected:
             self.ws_clients.discard(ws)
     
+    async def _log_process_output(self, process: subprocess.Popen, script_name: str):
+        """Log script output in real-time"""
+        try:
+            while True:
+                line = await asyncio.get_event_loop().run_in_executor(
+                    None, process.stdout.readline
+                )
+                
+                if not line:
+                    # Process finished
+                    break
+                
+                # Log the output
+                logger.info(f"[{script_name}] {line.rstrip()}")
+                
+        except Exception as e:
+            logger.error(f"Error reading process output: {e}")
+    
     # ========== Command Handlers ==========
     
     async def run_script(self, script_id: str, extra_args: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -232,10 +250,14 @@ class InterfaceServer:
                 self.active_process = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
+                    stderr=subprocess.STDOUT,  # Merge stderr into stdout
+                    text=True,
+                    bufsize=1  # Line buffered
                 )
                 self.active_script = script_id
+                
+                # Start background task to log output
+                asyncio.create_task(self._log_process_output(self.active_process, script.name))
                 
                 # Notify clients
                 await self._broadcast({

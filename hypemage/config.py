@@ -246,8 +246,8 @@ def get_default_config() -> Dict[str, Any]:
         },
         "hsv_ranges": {
             "ball": {
-                "lower": [0, 140, 60],
-                "upper": [20, 255, 255],
+                "lower": [0, 140, 150],
+                "upper": [50, 255, 255],
                 "min_area": 100,
                 "max_area": 50000
             },

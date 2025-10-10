@@ -33,7 +33,7 @@
       "ball": {
         "lower": [0, 140, 150],
         "upper": [20, 255, 255],
-        "min_area": 100,
+        "min_area": 0,
         "max_area": 50000
       },
       "blue_goal": {
@@ -62,7 +62,7 @@
       "ball": {
         "lower": [0, 100, 30],
         "upper": [20, 255, 255],
-        "min_area": 100,
+        "min_area": 0,
         "max_area": 50000
       },
       "blue_goal": {

@@ -273,5 +273,7 @@ def get_default_config() -> Dict[str, Any]:
             "i2c_address": "0x50",
             "max_speed": 255,
             "acceleration": 50
-        }
+        },
+        "motor_addresses": [26, 27, 29, 25],
+        "motor_multipliers": [-1.0, -1.0, 1.0, 1.0]
     }

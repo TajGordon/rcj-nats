@@ -859,24 +859,8 @@ class Scylla:
                 # Ensure angle is in 0-360° range
                 ball_angle = ball_angle % 360
                 
-                # Calculate speed based on ball distance (closer = slower for precision)
-                # Use ball area as proxy for distance (larger area = closer ball)
-                # Typical ball areas might range from 100 (far) to 10000+ (very close)
-                if ball.area > 2000:  # Ball is very close
-                    speed = 0.25  # Very slow for precision
-                    dribbler_speed = 0.7  # High dribbler speed when close
-                elif ball.area > 1000:  # Ball is close
-                    speed = 0.4  # Moderate speed
-                    dribbler_speed = 0.6
-                elif ball.area > 500:  # Ball is medium distance
-                    speed = 0.6  # Medium-high speed
-                    dribbler_speed = 0.5
-                else:  # Ball is far
-                    speed = 0.8  # Fast to close distance
-                    dribbler_speed = 0.4  # Lower dribbler when far
-                
-                # Enable dribbler when chasing ball
-                self.enable_dribbler(dribbler_speed)
+                # Use constant speed for ball chasing
+                speed = 0.05
                 
                 # Proportional rotation control for better alignment
                 # The more the ball is off-center horizontally, the more we rotate

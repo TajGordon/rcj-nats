@@ -60,6 +60,7 @@ class State(Enum):
     LINEUP_KICK = auto()
     STOPPED = auto()
     MOVE_IN_SQUARE = auto()  # Example state for testing movement
+    MOVE_STRAIGHT = auto()   # Move forward in straight line
 
 
 @dataclass
@@ -125,6 +126,12 @@ class Scylla:
             update_rate_hz=10.0
         ),
         State.MOVE_IN_SQUARE: StateConfig(
+            needs_camera=False,
+            needs_localization=False,
+            needs_motors=True,
+            update_rate_hz=20.0
+        ),
+        State.MOVE_STRAIGHT: StateConfig(
             needs_camera=False,
             needs_localization=False,
             needs_motors=True,
@@ -756,6 +763,27 @@ class Scylla:
         
         print(f"[SQUARE] Step {self._square_step}, Direction {current_direction}°, Speed {self._square_speed}")
     
+    def state_move_straight(self):
+        """
+        Move robot forward in a straight line
+        
+        This state simply moves the robot forward at a constant speed.
+        Press any button to stop.
+        """
+        if not self.motor_controller:
+            logger.warning("No motor controller - cannot move straight")
+            return
+        
+        # Move forward at 50% speed
+        forward_speed = 0.5
+        self.motor_controller.move_robot_relative(
+            angle=0,  # 0° = forward
+            speed=forward_speed,
+            rotation=0.0  # No rotation
+        )
+        
+        print(f"[STRAIGHT] Moving forward at {forward_speed*100:.0f}% speed")
+    
     # ==================== STATE ENTER/EXIT HOOKS ====================
     
     def on_enter_chase_ball(self):
@@ -832,7 +860,6 @@ if __name__ == '__main__':
     
     # Create and start the FSM
     scylla = Scylla(config=config)
-    # TODO: TEMPORARY - Remove this line after testing square movement
-    scylla.transition_to(State.MOVE_IN_SQUARE)  # Start in square movement for testing
-    # scylla.transition_to(State.SEARCH_BALL)  # Normal starting state
+    # Start in straight line movement
+    scylla.transition_to(State.MOVE_STRAIGHT)  # Move forward in straight line
     scylla.start()

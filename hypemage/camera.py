@@ -198,10 +198,27 @@ class CameraProcess:
             'goal_center_tolerance': detection_cfg.get("goal_center_tolerance", 0.15)
         }
         
-        # Circular mask (for field boundary)
+        # Mirror detection and masking
+        mirror_cfg = self.config.get('mirror', {})
+        self.enable_mirror_detection = mirror_cfg.get('enable', True)
+        self.mirror_detection_method = mirror_cfg.get('detection_method', 'hough')  # 'hough' or 'contour'
+        self.mirror_min_radius = mirror_cfg.get('min_radius', 100)
+        self.mirror_max_radius = mirror_cfg.get('max_radius', 400)
+        self.mirror_canny_threshold1 = mirror_cfg.get('canny_threshold1', 50)
+        self.mirror_canny_threshold2 = mirror_cfg.get('canny_threshold2', 150)
+        self.mirror_hough_param1 = mirror_cfg.get('hough_param1', 100)
+        self.mirror_hough_param2 = mirror_cfg.get('hough_param2', 30)
+        
+        # Detected mirror properties (updated each frame or cached)
+        self.mirror_circle = None  # (center_x, center_y, radius)
+        self.mirror_mask = None  # Binary mask for the mirror area
+        self.mirror_detection_interval = mirror_cfg.get('detection_interval', 30)  # Detect every N frames
+        self.mirror_detection_counter = 0
+        
+        # Fallback circular mask (for when mirror not detected or disabled)
         self.mask_center_x = cam_cfg["width"] // 2
         self.mask_center_y = cam_cfg["height"] // 2
-        self.mask_radius = 80  # Default radius for field mask
+        self.mask_radius = mirror_cfg.get('fallback_radius', 200)  # Default radius if mirror not found
         
         # Frame counter for frame IDs
         self.frame_counter = 0
@@ -236,6 +253,167 @@ class CameraProcess:
         """Capture a frame from the camera"""
         return self.capture_fn()
     
+    def detect_mirror_circle(self, frame) -> Optional[Tuple[int, int, int]]:
+        """
+        Detect the circular mirror in the frame
+        
+        Args:
+            frame: Input frame from camera (BGR)
+            
+        Returns:
+            Tuple of (center_x, center_y, radius) if detected, None otherwise
+        """
+        if not self.enable_mirror_detection:
+            logger.debug("Mirror detection disabled, using fallback")
+            return None
+        
+        # Convert to grayscale for circle detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        if self.mirror_detection_method == 'hough':
+            # Use Hough Circle Transform for robust circle detection
+            # Apply Gaussian blur to reduce noise
+            blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+            
+            # Detect circles using Hough transform
+            circles = cv2.HoughCircles(
+                blurred,
+                cv2.HOUGH_GRADIENT,
+                dp=1,
+                minDist=gray.shape[0] // 2,  # Minimum distance between circles (expect only 1 mirror)
+                param1=self.mirror_hough_param1,  # Canny edge detector high threshold
+                param2=self.mirror_hough_param2,  # Accumulator threshold for circle centers
+                minRadius=self.mirror_min_radius,
+                maxRadius=self.mirror_max_radius
+            )
+            
+            if circles is not None:
+                # Convert to integer coordinates
+                circles = np.round(circles[0, :]).astype("int")
+                
+                # Take the largest circle (most likely the mirror)
+                largest_circle = max(circles, key=lambda c: c[2])  # Sort by radius
+                center_x, center_y, radius = largest_circle
+                
+                logger.info(f"Mirror detected (Hough): center=({center_x}, {center_y}), radius={radius}")
+                return (int(center_x), int(center_y), int(radius))
+            else:
+                logger.debug("No mirror circle detected with Hough transform")
+                return None
+        
+        elif self.mirror_detection_method == 'contour':
+            # Alternative: Use contour detection for the mirror
+            # Apply edge detection
+            edges = cv2.Canny(gray, self.mirror_canny_threshold1, self.mirror_canny_threshold2)
+            
+            # Find contours
+            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            if not contours:
+                logger.debug("No contours found for mirror detection")
+                return None
+            
+            # Find the most circular contour
+            best_circle = None
+            best_circularity = 0
+            
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                if area < math.pi * self.mirror_min_radius ** 2:
+                    continue
+                if area > math.pi * self.mirror_max_radius ** 2:
+                    continue
+                
+                # Calculate circularity: 4π(area/perimeter²)
+                # Perfect circle = 1.0
+                perimeter = cv2.arcLength(contour, True)
+                if perimeter == 0:
+                    continue
+                    
+                circularity = 4 * math.pi * area / (perimeter * perimeter)
+                
+                if circularity > best_circularity and circularity > 0.7:  # Must be reasonably circular
+                    # Fit a circle to this contour
+                    (x, y), radius = cv2.minEnclosingCircle(contour)
+                    if self.mirror_min_radius <= radius <= self.mirror_max_radius:
+                        best_circle = (int(x), int(y), int(radius))
+                        best_circularity = circularity
+            
+            if best_circle:
+                logger.info(f"Mirror detected (Contour): center=({best_circle[0]}, {best_circle[1]}), "
+                          f"radius={best_circle[2]}, circularity={best_circularity:.2f}")
+                return best_circle
+            else:
+                logger.debug("No circular contour found for mirror")
+                return None
+        
+        else:
+            logger.warning(f"Unknown mirror detection method: {self.mirror_detection_method}")
+            return None
+    
+    def update_mirror_mask(self, frame):
+        """
+        Update the mirror mask if needed (every N frames or if not yet detected)
+        
+        Args:
+            frame: Current camera frame
+        """
+        # Only detect mirror periodically to save computation
+        self.mirror_detection_counter += 1
+        
+        if (self.mirror_circle is None or 
+            self.mirror_detection_counter >= self.mirror_detection_interval):
+            
+            self.mirror_detection_counter = 0
+            
+            # Detect the mirror circle
+            detected_circle = self.detect_mirror_circle(frame)
+            
+            if detected_circle is not None:
+                self.mirror_circle = detected_circle
+                center_x, center_y, radius = detected_circle
+                
+                # Create a binary mask for the mirror area
+                # The mask is white (255) inside the circle, black (0) outside
+                height, width = frame.shape[:2]
+                self.mirror_mask = np.zeros((height, width), dtype=np.uint8)
+                cv2.circle(self.mirror_mask, (center_x, center_y), radius, 255, -1)
+                
+                logger.info(f"Mirror mask updated: center=({center_x}, {center_y}), radius={radius}")
+            else:
+                # Mirror not detected, use fallback circular mask
+                if self.mirror_mask is None:
+                    height, width = frame.shape[:2]
+                    self.mirror_mask = np.zeros((height, width), dtype=np.uint8)
+                    cv2.circle(self.mirror_mask, 
+                             (self.mask_center_x, self.mask_center_y), 
+                             self.mask_radius, 255, -1)
+                    logger.warning(f"Mirror not detected, using fallback mask: "
+                                 f"center=({self.mask_center_x}, {self.mask_center_y}), "
+                                 f"radius={self.mask_radius}")
+    
+    def apply_mirror_mask(self, image):
+        """
+        Apply the mirror mask to an image (keeps only the mirror area)
+        
+        Args:
+            image: Input image (can be BGR, grayscale, or binary mask)
+            
+        Returns:
+            Masked image (black outside mirror, original inside)
+        """
+        if self.mirror_mask is None:
+            logger.warning("Mirror mask not initialized, returning original image")
+            return image
+        
+        # Apply mask using bitwise AND
+        if len(image.shape) == 3:
+            # Color image - apply mask to all channels
+            return cv2.bitwise_and(image, image, mask=self.mirror_mask)
+        else:
+            # Grayscale or binary image
+            return cv2.bitwise_and(image, image, mask=self.mirror_mask)
+    
     def detect_ball(self, frame) -> BallDetectionResult:
         """
         Detect orange ball in the frame using HSV color filtering
@@ -246,12 +424,19 @@ class CameraProcess:
         Returns:
             BallDetectionResult with detection info
         """
+        # Update mirror mask if needed
+        self.update_mirror_mask(frame)
+        
         # Convert to HSV (Picamera2 returns BGR format)
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         
-        mask = cv2.inRange(hsv, self.lower_orange, self.upper_orange)
-        mask = self._apply_circular_mask(mask)
+        # Apply mirror mask to HSV frame to only process the mirror area
+        hsv_masked = self.apply_mirror_mask(hsv)
         
+        # Create color mask for orange ball
+        mask = cv2.inRange(hsv_masked, self.lower_orange, self.upper_orange)
+        
+        # Find contours in the masked region
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
         logger.debug(f"Ball detection: Found {len(contours)} contours")
@@ -314,20 +499,31 @@ class CameraProcess:
         Returns:
             Tuple of (blue_goal_result, yellow_goal_result)
         """
+        # Update mirror mask if needed (will be cached if already done this frame)
+        self.update_mirror_mask(frame)
+        
         # Convert to HSV (Picamera2 returns BGR format)
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         
-        blue_result = self._detect_single_goal(hsv, self.blue_goal_config)
-        yellow_result = self._detect_single_goal(hsv, self.yellow_goal_config)
+        # Apply mirror mask to HSV frame
+        hsv_masked = self.apply_mirror_mask(hsv)
+        
+        blue_result = self._detect_single_goal(hsv_masked, self.blue_goal_config)
+        yellow_result = self._detect_single_goal(hsv_masked, self.yellow_goal_config)
         
         return blue_result, yellow_result
     
     def _detect_single_goal(self, hsv_frame, goal_config) -> GoalDetectionResult:
-        """Detect a single goal using HSV filtering"""
+        """
+        Detect a single goal using HSV filtering
+        
+        Args:
+            hsv_frame: HSV frame (already masked for mirror area)
+            goal_config: Goal detection configuration
+        """
         lower = np.array(goal_config["lower"])
         upper = np.array(goal_config["upper"])
         mask = cv2.inRange(hsv_frame, lower, upper)
-        mask = self._apply_circular_mask(mask)
         
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
@@ -371,14 +567,6 @@ class CameraProcess:
             vertical_error=vertical_error,
             is_centered_horizontally=is_centered
         )
-    
-    def _apply_circular_mask(self, mask):
-        """Apply a circular mask to ignore the center area"""
-        mask_with_circle = np.zeros_like(mask)
-        cv2.circle(mask_with_circle, (self.mask_center_x, self.mask_center_y), 
-                   self.mask_radius, 255, -1)
-        circle_mask = cv2.bitwise_not(mask_with_circle)
-        return cv2.bitwise_and(mask, circle_mask)
     
     def stop(self):
         """Stop the camera"""

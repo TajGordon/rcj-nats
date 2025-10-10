@@ -185,23 +185,32 @@ createApp({
         handleInterfaceMessage(robotName, data) {
             const robot = this[robotName];
             
+            console.log(`[${robot.name}] Interface message:`, data);
+            
             if (data.type === 'status') {
                 // Server status update
                 robot.status = data.data.robot_running ? 'running' : 'stopped';
                 robot.pid = data.data.pid;
+                console.log(`[${robot.name}] Status update: ${robot.status}, PID: ${robot.pid}`);
             } else if (data.type === 'process_started') {
                 // Process successfully started
                 robot.status = 'running';
                 robot.pid = data.pid;
+                console.log(`[${robot.name}] Process started: PID ${data.pid}`);
                 this.showNotification(`${robot.name}: ${data.script_name || 'Script'} started`, 'success');
             } else if (data.type === 'process_stopped') {
                 // Process stopped
                 robot.status = 'stopped';
                 robot.pid = null;
+                console.log(`[${robot.name}] Process stopped`);
                 this.showNotification(`${robot.name}: Script stopped`, 'info');
             } else if (data.type === 'error') {
                 // Error message from server
+                console.error(`[${robot.name}] Error from server:`, data.message);
                 this.showNotification(`${robot.name}: ${data.message}`, 'error');
+            } else if (data.type === 'response') {
+                // Response to command
+                console.log(`[${robot.name}] Command response:`, data.data);
             }
         },
         
@@ -270,12 +279,17 @@ createApp({
         sendCommand(robotName, command, args = {}) {
             const robot = this[robotName];
             
+            console.log(`[${robot.name}] Sending command:`, command, args);
+            
             if (!robot.interfaceWs || robot.interfaceWs.readyState !== WebSocket.OPEN) {
+                console.error(`[${robot.name}] Cannot send command - not connected`);
                 this.showNotification(`${robot.name} not connected`, 'error');
                 return false;
             }
             
-            robot.interfaceWs.send(JSON.stringify({ command, args }));
+            const message = JSON.stringify({ command, args });
+            console.log(`[${robot.name}] WebSocket send:`, message);
+            robot.interfaceWs.send(message);
             return true;
         },
         
@@ -286,6 +300,7 @@ createApp({
         },
         
         startScript(robotName, scriptId) {
+            console.log(`[${this[robotName].name}] Starting script: ${scriptId}`);
             if (this.sendCommand(robotName, 'run_script', { script_id: scriptId })) {
                 this.showNotification(`${this[robotName].name}: Starting ${scriptId}...`, 'info');
             }

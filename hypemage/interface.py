@@ -448,17 +448,25 @@ async def websocket_endpoint(websocket: WebSocket):
         # Handle messages
         while True:
             message = await websocket.receive_text()
+            logger.info(f"Received WebSocket message: {message}")
+            
             try:
                 data = json.loads(message)
                 command = data.get('command')
+                args = data.get('args', {})
+                
+                logger.info(f"Processing command: {command} with args: {args}")
                 
                 if command == 'run_script':
-                    script_id = data.get('script_id')
-                    extra_args = data.get('args', [])
+                    script_id = args.get('script_id')
+                    extra_args = args.get('args', [])
+                    logger.info(f"Running script: {script_id} with extra_args: {extra_args}")
                     result = await server.run_script(script_id, extra_args)
+                    logger.info(f"Script result: {result}")
                     await websocket.send_json({'type': 'response', 'data': result})
                 
                 elif command == 'stop_script':
+                    logger.info("Stopping script")
                     result = await server.stop_script()
                     await websocket.send_json({'type': 'response', 'data': result})
                 
@@ -471,18 +479,20 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({'type': 'response', 'data': scripts})
                 
                 else:
+                    logger.warning(f"Unknown command: {command}")
                     await websocket.send_json({
                         'type': 'error',
                         'message': f'Unknown command: {command}'
                     })
             
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON: {e}")
                 await websocket.send_json({
                     'type': 'error',
                     'message': 'Invalid JSON'
                 })
             except Exception as e:
-                logger.error(f"Error handling message: {e}")
+                logger.error(f"Error handling message: {e}", exc_info=True)
                 await websocket.send_json({
                     'type': 'error',
                     'message': str(e)

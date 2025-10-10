@@ -638,6 +638,28 @@ def add_debug_overlays(frame: np.ndarray, vision_data: VisionData) -> np.ndarray
     cv2.putText(display_frame, frame_label, (10, 30),
                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
     
+    # Add "none detected" in center if no detections
+    if not (vision_data.ball.detected or vision_data.blue_goal.detected or vision_data.yellow_goal.detected):
+        center_x = frame_width // 2
+        center_y = frame_height // 2
+        
+        # Get text size for centering
+        text = "none detected"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.0
+        thickness = 2
+        (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+        
+        # Center the text
+        text_x = center_x - text_width // 2
+        text_y = center_y + text_height // 2
+        
+        # Draw text with outline for better visibility
+        cv2.putText(display_frame, text, (text_x, text_y),
+                   font, font_scale, (0, 0, 0), thickness + 2)  # Black outline
+        cv2.putText(display_frame, text, (text_x, text_y),
+                   font, font_scale, (255, 255, 255), thickness)  # White text
+    
     return display_frame
 
 

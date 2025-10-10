@@ -162,16 +162,20 @@ createApp({
             const ws = new WebSocket(url);
             
             ws.onopen = () => {
-                console.log(`[${robot.name}] Debug connected`);
+                console.log(`[${robot.name}] Debug connected ✓`);
+                if (!silent) {
+                    this.showNotification(`${robot.name} debug connected`, 'success');
+                }
             };
             
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
+                console.log(`[${robot.name}] Debug message:`, data);
                 this.handleDebugMessage(robotName, data);
             };
             
             ws.onerror = (error) => {
-                console.error(`[${robot.name}] Debug error:`, error);
+                console.error(`[${robot.name}] Debug error (server may not be running):`, error);
             };
             
             ws.onclose = () => {
@@ -197,6 +201,11 @@ createApp({
                 robot.status = 'running';
                 robot.pid = data.pid;
                 console.log(`[${robot.name}] Process started: PID ${data.pid}`);
+                
+                // Reconnect to debug WebSocket (in case it's a camera/debug script)
+                console.log(`[${robot.name}] Reconnecting to debug WebSocket...`);
+                setTimeout(() => this.connectDebug(robotName, true), 1000);
+                
                 this.showNotification(`${robot.name}: ${data.script_name || 'Script'} started`, 'success');
             } else if (data.type === 'process_stopped') {
                 // Process stopped

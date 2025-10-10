@@ -1,16 +1,14 @@
 """
-Simple Camera Streamer - Streams raw camera feed to web dashboard
+Simple Camera Streamer - Streams raw camera feed via HTTP
 
-This creates its own WebSocket server to stream camera directly to the dashboard.
+This creates an HTTP server that streams MJPEG video to the dashboard.
 
 Usage:
     python -m hypemage.scripts.camera_stream
 """
 
 import asyncio
-import websockets
-import json
-import base64
+from aiohttp import web
 import cv2
 import time
 import socket
@@ -39,30 +37,16 @@ class CameraStreamer:
     def __init__(self):
         self.robot_id = get_robot_id()
         self.camera = None
-        self.clients = set()
         
-    async def handle_client(self, websocket):
-        """Handle a WebSocket client connection"""
-        client_addr = websocket.remote_address
-        log(f"Client connected: {client_addr}")
-        self.clients.add(websocket)
+    async def mjpeg_handler(self, request):
+        """Handle MJPEG stream requests"""
+        log(f"Client connected: {request.remote}")
+        
+        response = web.StreamResponse()
+        response.content_type = 'multipart/x-mixed-replace; boundary=frame'
+        await response.prepare(request)
         
         try:
-            # Keep connection alive and handle any messages
-            async for message in websocket:
-                pass  # Just keep connection open
-        except websockets.exceptions.ConnectionClosed:
-            pass
-        finally:
-            self.clients.remove(websocket)
-            log(f"Client disconnected: {client_addr}")
-    
-    async def stream_frames(self):
-        """Continuously capture and broadcast frames"""
-        try:
-            self.camera = CameraProcess(robot_id=self.robot_id)
-            log("Camera initialized")
-            
             frame_count = 0
             while True:
                 start_time = time.time()
@@ -73,55 +57,49 @@ class CameraStreamer:
                     await asyncio.sleep(0.1)
                     continue
                 
-                # Only encode if we have clients
-                if not self.clients:
-                    await asyncio.sleep(0.1)
-                    continue
-                
                 # Encode to JPEG
                 _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                frame_b64 = base64.b64encode(buffer).decode('ascii')
                 
-                # Prepare message
-                fps = int(1.0 / (time.time() - start_time)) if frame_count > 0 else 0
-                message = json.dumps({
-                    'type': 'update',
-                    'subsystem': 'camera',
-                    'data': {
-                        'frame_jpeg': frame_b64,
-                        'fps': fps,
-                        'frame_id': frame_count
-                    }
-                })
-                
-                # Send to all clients
-                disconnected = []
-                for client in self.clients:
-                    try:
-                        await client.send(message)
-                    except:
-                        disconnected.append(client)
-                
-                # Remove disconnected clients
-                for client in disconnected:
-                    self.clients.discard(client)
+                # Send as multipart
+                await response.write(
+                    b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n\r\n' + 
+                    buffer.tobytes() + 
+                    b'\r\n'
+                )
                 
                 frame_count += 1
                 if frame_count % 100 == 0:
-                    log(f"Streamed {frame_count} frames to {len(self.clients)} clients")
+                    fps = int(1.0 / (time.time() - start_time))
+                    log(f"Streamed {frame_count} frames (~{fps} FPS)")
                 
                 # Limit to ~30 FPS
                 elapsed = time.time() - start_time
                 if elapsed < 0.033:
                     await asyncio.sleep(0.033 - elapsed)
                     
+        except asyncio.CancelledError:
+            log(f"Client disconnected: {request.remote}")
         except Exception as e:
-            log(f"ERROR in stream_frames: {e}")
-            import traceback
-            traceback.print_exc()
+            log(f"ERROR in stream: {e}")
         finally:
-            if self.camera:
-                del self.camera
+            await response.write_eof()
+        
+        return response
+    
+    async def index_handler(self, request):
+        """Simple test page"""
+        html = f"""
+        <html>
+        <head><title>Camera Stream - {self.robot_id}</title></head>
+        <body>
+            <h1>Camera Stream - {self.robot_id.upper()}</h1>
+            <img src="/stream" width="640" height="480">
+            <p>Stream URL: <code>http://{request.host}/stream</code></p>
+        </body>
+        </html>
+        """
+        return web.Response(text=html, content_type='text/html')
 
 
 async def main():
@@ -129,17 +107,44 @@ async def main():
     port = get_debug_port()
     robot_id = get_robot_id()
     
-    log(f"Starting camera stream server for {robot_id}")
-    log(f"WebSocket server: ws://0.0.0.0:{port}")
+    log(f"Starting camera stream HTTP server for {robot_id}")
+    log(f"HTTP server: http://0.0.0.0:{port}")
     
     streamer = CameraStreamer()
     
-    # Start WebSocket server
-    async with websockets.serve(streamer.handle_client, "0.0.0.0", port):
-        log("WebSocket server started")
-        
-        # Start streaming task
-        await streamer.stream_frames()
+    # Initialize camera
+    try:
+        streamer.camera = CameraProcess(robot_id=robot_id)
+        log("Camera initialized")
+    except Exception as e:
+        log(f"ERROR: Failed to initialize camera: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+    
+    # Create HTTP app
+    app = web.Application()
+    app.router.add_get('/', streamer.index_handler)
+    app.router.add_get('/stream', streamer.mjpeg_handler)
+    
+    # Start server
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    
+    log(f"HTTP server started on port {port}")
+    log(f"Stream URL: http://0.0.0.0:{port}/stream")
+    
+    # Keep running
+    try:
+        await asyncio.Event().wait()
+    except KeyboardInterrupt:
+        log("Shutting down...")
+    finally:
+        await runner.cleanup()
+        if streamer.camera:
+            del streamer.camera
 
 
 if __name__ == "__main__":

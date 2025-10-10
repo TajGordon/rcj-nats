@@ -636,7 +636,7 @@ class Scylla:
             self._square_step = 0  # 0=forward, 1=left, 2=back, 3=right
             self._square_start_time = time.time()
             self._square_step_duration = 1.0  # 1 second per side
-            self._square_speed = 0.3  # 30% speed
+            self._square_speed = 0.05
             
             # Setup GPIO button on D26 (if not already setup)
             try:

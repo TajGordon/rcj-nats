@@ -254,11 +254,16 @@ class CameraProcess:
         
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
+        logger.debug(f"Ball detection: Found {len(contours)} contours")
+        
         # Filter contours by area (only max area to avoid huge objects)
         filtered_contours = [x for x in contours if 
                            cv2.contourArea(x) < self.max_ball_area]
         
+        logger.debug(f"Ball detection: {len(filtered_contours)} contours after max area filter (max_area={self.max_ball_area})")
+        
         if not filtered_contours:
+            logger.debug("Ball detection: No contours found after filtering")
             return BallDetectionResult(detected=False)
         
         largest_contour = max(filtered_contours, key=cv2.contourArea)
@@ -268,9 +273,12 @@ class CameraProcess:
         center_y = int(y)
         radius = int(radius)
         
+        logger.debug(f"Ball detection: Largest contour at ({center_x}, {center_y}) with radius {radius}")
+        
         # Filter by minimum radius (more intuitive than area)
         min_radius = 2  # Minimum 2 pixel radius
         if radius < min_radius:
+            logger.debug(f"Ball detection: Radius {radius} below minimum {min_radius}, rejecting")
             return BallDetectionResult(detected=False)
         
         # Calculate proximity info
@@ -279,6 +287,9 @@ class CameraProcess:
         vertical_error = (center_y - self.frame_center_y) / self.frame_center_y
         is_close = ball_area >= self.proximity_threshold
         is_centered = abs(horizontal_error) <= self.angle_tolerance
+        
+        logger.info(f"Ball detected: pos=({center_x}, {center_y}) radius={radius} area={ball_area:.1f} "
+                   f"close={is_close} centered={is_centered}")
         
         return BallDetectionResult(
             detected=True,

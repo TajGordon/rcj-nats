@@ -188,6 +188,13 @@ class Scylla:
         try:
             logger.info("Initializing motor controller...")
             motor_config = self.config.get('motors', {})
+            # Add motor-specific config from top level
+            motor_config['motor_addresses'] = self.config.get('motor_addresses', [26, 27, 29, 25])
+            motor_config['motor_multipliers'] = self.config.get('motor_multipliers', [-1.0, -1.0, 1.0, 1.0])
+            motor_config['max_speed'] = self.config.get('max_speed', 400000000)
+            motor_config['current_limit_foc'] = self.config.get('current_limit_foc', 196608)
+            motor_config['watchdog_enabled'] = self.config.get('watchdog_enabled', True)
+            motor_config['watchdog_timeout'] = self.config.get('watchdog_timeout', 0.5)
             self.motor_controller = MotorController(config=motor_config, threaded=True)
             self.status.motors = True
             logger.info("✓ Motor controller initialized successfully")

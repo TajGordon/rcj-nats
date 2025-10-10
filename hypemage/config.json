@@ -31,20 +31,20 @@
     
     "hsv_ranges": {
       "ball": {
-        "lower": [0, 132, 61],
-        "upper": [14, 255, 255],
+        "lower": [0, 222, 144],
+        "upper": [4, 255, 255],
         "min_area": 100,
         "max_area": 50000
       },
       "blue_goal": {
-        "lower": [100, 150, 50],
-        "upper": [120, 255, 255],
+        "lower": [92, 242, 155],
+        "upper": [110, 255, 236],
         "min_area": 500,
         "max_area": 100000
       },
       "yellow_goal": {
-        "lower": [20, 100, 100],
-        "upper": [40, 255, 255],
+        "lower": [14, 202, 97],
+        "upper": [23, 255, 177],
         "min_area": 500,
         "max_area": 100000
       }
@@ -60,20 +60,20 @@
     
     "hsv_ranges": {
       "ball": {
-        "lower": [0, 132, 61],
-        "upper": [14, 255, 255],
+        "lower": [0, 222, 144],
+        "upper": [4, 255, 255],
         "min_area": 100,
         "max_area": 50000
       },
       "blue_goal": {
-        "lower": [100, 150, 50],
-        "upper": [120, 255, 255],
+        "lower": [92, 242, 155],
+        "upper": [110, 255, 236],
         "min_area": 500,
         "max_area": 100000
       },
       "yellow_goal": {
-        "lower": [20, 100, 100],
-        "upper": [40, 255, 255],
+        "lower": [14, 202, 97],
+        "upper": [23, 255, 177],
         "min_area": 500,
         "max_area": 100000
       }

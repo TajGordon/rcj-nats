@@ -24,12 +24,40 @@ import os
 import socket
 from pathlib import Path
 from typing import Dict, Any, Optional
+from copy import deepcopy
 from hypemage.logger import get_logger
 
 logger = get_logger(__name__)
 
 # Path to the central config file
 CONFIG_PATH = Path(__file__).parent / "config.json"
+
+
+def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Deep merge two dictionaries, with override taking precedence
+    
+    Args:
+        base: Base dictionary (defaults)
+        override: Override dictionary (robot-specific)
+    
+    Returns:
+        Merged dictionary
+    """
+    result = deepcopy(base)
+    
+    for key, value in override.items():
+        if key.startswith('_'):  # Skip comment fields
+            continue
+            
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            # Recursively merge nested dicts
+            result[key] = deep_merge(result[key], value)
+        else:
+            # Override value
+            result[key] = deepcopy(value)
+    
+    return result
 
 
 def get_robot_id(override: Optional[str] = None) -> str:
@@ -81,14 +109,14 @@ def get_robot_id(override: Optional[str] = None) -> str:
 
 def load_config(robot_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Load configuration for a specific robot
+    Load configuration for a specific robot, merging with defaults
     
     Args:
         robot_id: Which robot to load config for ('storm' or 'necron')
                  If None, auto-detects using get_robot_id()
     
     Returns:
-        Dictionary with configuration for this robot
+        Dictionary with configuration for this robot (defaults + robot-specific overrides)
     
     Raises:
         FileNotFoundError: If config.json doesn't exist
@@ -106,11 +134,21 @@ def load_config(robot_id: Optional[str] = None) -> Dict[str, Any]:
         with open(CONFIG_PATH, 'r') as f:
             all_config = json.load(f)
         
-        if robot_id not in all_config:
-            raise KeyError(f"Robot '{robot_id}' not found in config. Available: {list(all_config.keys())}")
+        # Get defaults
+        defaults = all_config.get('defaults', {})
         
-        logger.info(f"Loaded configuration for robot: {robot_id}")
-        return all_config[robot_id]
+        # Get robot-specific config
+        if robot_id not in all_config:
+            available = [k for k in all_config.keys() if not k.startswith('_') and k != 'defaults']
+            raise KeyError(f"Robot '{robot_id}' not found in config. Available: {available}")
+        
+        robot_config = all_config[robot_id]
+        
+        # Merge defaults with robot-specific config
+        merged_config = deep_merge(defaults, robot_config)
+        
+        logger.info(f"Loaded configuration for robot: {robot_id} (with defaults merged)")
+        return merged_config
     
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON in config file: {e}")
@@ -120,16 +158,22 @@ def load_config(robot_id: Optional[str] = None) -> Dict[str, Any]:
         raise
 
 
-def save_config(robot_id: str, config: Dict[str, Any]) -> None:
+def save_config(robot_id: str, config: Dict[str, Any], save_only_overrides: bool = False) -> None:
     """
     Save configuration for a specific robot
     
     Args:
         robot_id: Which robot to save config for ('storm' or 'necron')
         config: Configuration dictionary to save
+        save_only_overrides: If True, only saves values that differ from defaults
+                            If False, saves the full merged config
     
     Raises:
         FileNotFoundError: If config.json doesn't exist
+    
+    Note:
+        By default, saves the full merged config (easier to understand).
+        Use save_only_overrides=True for a cleaner config file with less duplication.
     """
     robot_id = robot_id.lower()
     

@@ -4,7 +4,7 @@ A Vue.js-powered web dashboard for controlling and monitoring Storm and Necron r
 
 ## Features
 
-- **Multi-Robot Support**: Connect to both Storm and Necron simultaneously
+- **Multi-Robot Support**: Connect to both Storm and Necron simultaneously over network
 - **3 View Modes**: 
   - Both (side-by-side comparison)
   - Storm (detailed single robot view)
@@ -15,35 +15,68 @@ A Vue.js-powered web dashboard for controlling and monitoring Storm and Necron r
 
 ## Quick Start
 
-### 1. Configure Robot IPs
+### Prerequisites
 
-Edit `app.js` and update the robot IPs:
+1. **Robots must be on the same network** as your laptop
+2. **mDNS/Bonjour** must be working (`.local` hostnames)
+3. **Interface servers running** on both robots
+
+### Setup
+
+1. **On Storm robot (f7)**:
+   ```bash
+   cd ~/rcj-nats
+   python -m hypemage.interface
+   ```
+   Output should show:
+   ```
+   INFO - Detected Storm robot (f7) - using port 8080
+   INFO - Dashboard: http://0.0.0.0:8080
+   INFO - WebSocket: ws://0.0.0.0:8080/ws
+   ```
+
+2. **On Necron robot (m7)**:
+   ```bash
+   cd ~/rcj-nats
+   python -m hypemage.interface
+   ```
+   Output should show:
+   ```
+   INFO - Detected Necron robot (m7) - using port 8081
+   INFO - Dashboard: http://0.0.0.0:8081
+   INFO - WebSocket: ws://0.0.0.0:8081/ws
+   ```
+
+3. **Open dashboard from your laptop**:
+   - Option A: `http://f7.local:8080` (connects to Storm's server)
+   - Option B: `http://m7.local:8081` (connects to Necron's server)
+   - **Either option can control both robots!**
+
+## Configuration
+
+The robot addresses are configured in `app.js`:
 
 ```javascript
 const ROBOT_CONFIG = {
-    storm: { name: 'Storm', host: 'f7.local', interfacePort: 8080, debugPort: 8765 },
-    necron: { name: 'Necron', host: 'm7.local', interfacePort: 8080, debugPort: 8765 }
+    storm: { 
+        host: 'f7.local',   // Storm's hostname
+        interfacePort: 8080, // Storm's interface port
+        debugPort: 8765 
+    },
+    necron: { 
+        host: 'm7.local',    // Necron's hostname
+        interfacePort: 8081, // Necron's interface port
+        debugPort: 8766 
+    }
 };
 ```
 
-### 2. Start the Interface Server
+### Port Reference
 
-On each robot (or locally for testing):
-
-```bash
-python -m hypemage.interface
-```
-
-This starts:
-- Interface server on port 8080 (commands & control)
-- Debug manager on port 8765 (camera & sensor data)
-
-### 3. Open the Dashboard
-
-Simply open `index.html` in your browser. The dashboard will:
-- Auto-connect to both robots
-- Show connection status in the header badges
-- Enable controls when robots are connected
+| Robot  | Hostname | Interface Port | Debug Port | WebSocket URL           |
+|--------|----------|----------------|------------|-------------------------|
+| Storm  | f7.local | 8080           | 8765       | ws://f7.local:8080/ws   |
+| Necron | m7.local | 8081           | 8766       | ws://m7.local:8081/ws   |
 
 ## Usage
 

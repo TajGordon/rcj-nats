@@ -5,10 +5,20 @@
 
 const { createApp } = Vue;
 
-// Robot configuration - EDIT THESE IPs
+// Robot configuration - Network addresses
 const ROBOT_CONFIG = {
-    storm: { name: 'Storm', host: 'f7.local', interfacePort: 8080, debugPort: 8765 },
-    necron: { name: 'Necron', host: 'm7.local', interfacePort: 8081, debugPort: 8766 }
+    storm: { 
+        name: 'Storm', 
+        host: 'f7.local', 
+        interfacePort: 8080, 
+        debugPort: 8765 
+    },
+    necron: { 
+        name: 'Necron', 
+        host: 'm7.local', 
+        interfacePort: 8081, 
+        debugPort: 8766 
+    }
 };
 
 const AVAILABLE_WIDGETS = [
@@ -35,6 +45,12 @@ createApp({
     },
     
     mounted() {
+        // Log configuration for debugging
+        console.log('%c=== Multi-Robot Dashboard ===', 'color: #4CAF50; font-weight: bold; font-size: 14px;');
+        console.log('Storm:', `ws://${ROBOT_CONFIG.storm.host}:${ROBOT_CONFIG.storm.interfacePort}/ws`);
+        console.log('Necron:', `ws://${ROBOT_CONFIG.necron.host}:${ROBOT_CONFIG.necron.interfacePort}/ws`);
+        console.log('==============================');
+        
         // Initial connection - silent (no notifications)
         this.connectRobot('storm', true);
         this.connectRobot('necron', true);

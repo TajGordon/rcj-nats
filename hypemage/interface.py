@@ -104,6 +104,13 @@ class InterfaceServer:
                 description='View camera feed with detection overlays (ball, goals)',
                 category='test'
             ),
+            'camera_stream': ScriptConfig(
+                name='Camera Stream',
+                module='hypemage.scripts.camera_stream',
+                args=[],
+                description='Stream raw camera feed to dashboard',
+                category='test'
+            ),
             'motor_test': ScriptConfig(
                 name='Motor Test',
                 module='motors.motor',

@@ -64,10 +64,11 @@ def get_robot_id(override: Optional[str] = None) -> str:
     # 3. Check hostname
     try:
         hostname = socket.gethostname().lower()
-        if 'storm' in hostname:
+        # f7 = Storm, m7 = Necron
+        if 'f7' in hostname or 'storm' in hostname:
             logger.info(f"Robot ID from hostname: storm (hostname={hostname})")
             return 'storm'
-        elif 'necron' in hostname:
+        elif 'm7' in hostname or 'necron' in hostname:
             logger.info(f"Robot ID from hostname: necron (hostname={hostname})")
             return 'necron'
     except Exception as e:

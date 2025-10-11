@@ -869,19 +869,14 @@ class Scylla:
             # Check if ball is close and centered - transition to lineup
             if ball.is_close_and_centered:
                 logger.info("Ball is close and centered - transitioning to lineup kick")
-                self.transition_to(State.LINEUP_KICK)
+                # self.transition_to(State.LINEUP_KICK)
                 return
             
             if self.motor_controller:
-                # Calculate angle to ball based on its position in camera frame
-                # The camera sees in polar coordinates from robot center
-                # horizontal_error: -1 (left) to +1 (right)
-                # Convert horizontal error to angle in degrees
-                # -1 (far left) = -90°, 0 (center) = 0°, +1 (far right) = +90°
-                ball_angle_from_center = ball.horizontal_error * 90.0  # Maps to [-90, +90]
-                
-                # Robot coordinate system: 0° = forward, 90° = right, -90° = left
-                # So ball_angle is already in robot coordinates
+                # Use angle and distance calculated by camera process
+                # ball.angle: angle from forward direction in degrees (-180 to 180)
+                # 0° = forward (up in mirror), 90° = right, -90° = left, ±180° = backward
+                # ball.distance: distance from mirror center in pixels
                 
                 # Determine speed based on how far off-center the ball is
                 # If ball is centered, move faster; if off to side, move slower to allow turning
@@ -900,14 +895,14 @@ class Scylla:
                 # Move towards the ball's angle
                 try:
                     self.motor_controller.move_robot_relative(
-                        angle=ball_angle_from_center,  # Move towards ball's position
+                        angle=ball.angle,  # Use angle calculated by camera process
                         speed=speed,
                         rotation=rotation
                     )
                     
                     logger.info(
-                        f"Chasing ball: angle={ball_angle_from_center:.1f}°, speed={speed:.3f}, "
-                        f"rotation={rotation:.3f}, h_err={ball.horizontal_error:.2f}, "
+                        f"Chasing ball: angle={ball.angle:.1f}°, distance={ball.distance:.1f}px, "
+                        f"speed={speed:.3f}, rotation={rotation:.3f}, h_err={ball.horizontal_error:.2f}, "
                         f"ball_pos=({ball.center_x}, {ball.center_y})"
                     )
                 except Exception as e:

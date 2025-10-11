@@ -65,6 +65,8 @@ class BallDetectionResult:
     area: float = 0.0
     horizontal_error: float = 0.0
     vertical_error: float = 0.0
+    distance: float = 0.0  # Distance from mirror center in pixels (Pythagorean)
+    angle: float = 0.0  # Angle from forward direction in degrees (-180 to 180)
     is_close: bool = False
     is_centered_horizontally: bool = False
     is_close_and_centered: bool = False
@@ -81,6 +83,8 @@ class GoalDetectionResult:
     area: float = 0.0
     horizontal_error: float = 0.0
     vertical_error: float = 0.0
+    distance: float = 0.0  # Distance from mirror center in pixels (Pythagorean)
+    angle: float = 0.0  # Angle from forward direction in degrees (-180 to 180)
     is_centered_horizontally: bool = False
 
 @dataclass
@@ -681,11 +685,24 @@ class CameraProcess:
         ball_area = math.pi * radius * radius
         horizontal_error = (center_x - self.frame_center_x) / self.frame_center_x
         vertical_error = (center_y - self.frame_center_y) / self.frame_center_y
+        
+        # Calculate distance from mirror center (Pythagorean theorem)
+        dx = center_x - self.frame_center_x
+        dy = center_y - self.frame_center_y
+        distance = math.sqrt(dx * dx + dy * dy)
+        
+        # Calculate angle from forward direction (degrees)
+        # Note: In image coordinates, y increases downward
+        # Forward direction is upward in the mirror (negative y direction)
+        # Angle is calculated as: 0° = forward (up), 90° = right, -90° = left, ±180° = backward
+        angle_rad = math.atan2(dx, -dy)  # atan2(x, -y) gives angle from upward direction
+        angle = math.degrees(angle_rad)  # Convert to degrees (-180 to 180)
+        
         is_close = ball_area >= self.proximity_threshold
         is_centered = abs(horizontal_error) <= self.angle_tolerance
         
         logger.info(f"Ball detected: pos=({center_x}, {center_y}) radius={radius} area={ball_area:.1f} "
-                   f"close={is_close} centered={is_centered} h_err={horizontal_error:.2f}")
+                   f"distance={distance:.1f}px angle={angle:.1f}° close={is_close} centered={is_centered} h_err={horizontal_error:.2f}")
         
         return BallDetectionResult(
             detected=True,
@@ -695,6 +712,8 @@ class CameraProcess:
             area=ball_area,
             horizontal_error=horizontal_error,
             vertical_error=vertical_error,
+            distance=distance,
+            angle=angle,
             is_close=is_close,
             is_centered_horizontally=is_centered,
             is_close_and_centered=is_close and is_centered
@@ -767,6 +786,18 @@ class CameraProcess:
         vertical_error = (center_y - self.frame_center_y) / self.frame_center_y
         is_centered = abs(horizontal_error) <= self.goal_detection_params["goal_center_tolerance"]
         
+        # Calculate distance from mirror center (Pythagorean theorem)
+        dx = center_x - self.frame_center_x
+        dy = center_y - self.frame_center_y
+        distance = math.sqrt(dx * dx + dy * dy)
+        
+        # Calculate angle from forward direction (degrees)
+        # Note: In image coordinates, y increases downward
+        # Forward direction is upward in the mirror (negative y direction)
+        # Angle is calculated as: 0° = forward (up), 90° = right, -90° = left, ±180° = backward
+        angle_rad = math.atan2(dx, -dy)  # atan2(x, -y) gives angle from upward direction
+        angle = math.degrees(angle_rad)  # Convert to degrees (-180 to 180)
+        
         return GoalDetectionResult(
             detected=True,
             center_x=center_x,
@@ -776,6 +807,8 @@ class CameraProcess:
             area=area,
             horizontal_error=horizontal_error,
             vertical_error=vertical_error,
+            distance=distance,
+            angle=angle,
             is_centered_horizontally=is_centered
         )
     

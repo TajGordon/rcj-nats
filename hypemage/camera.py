@@ -762,6 +762,9 @@ class CameraProcess:
         This zone is positioned in front of the robot where the ball may be
         partially obscured by the dribbler mechanism.
         
+        NOTE: This detection searches the RAW FRAME (no mirror mask applied)
+        to ensure it works even if the close zone extends outside the mirror circle.
+        
         Args:
             frame: Input frame from camera (BGR from Picamera2) - full frame
             
@@ -780,7 +783,8 @@ class CameraProcess:
         y1 = max(0, zone_center_y - self.close_zone_height // 2)
         y2 = min(frame.shape[0], zone_center_y + self.close_zone_height // 2)
         
-        # Extract close zone region
+        # Extract close zone region from RAW FRAME (no mask)
+        # This ensures we search the full rectangle even if it extends outside mirror
         close_zone = frame[y1:y2, x1:x2]
         
         if close_zone.size == 0:

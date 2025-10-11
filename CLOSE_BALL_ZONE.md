@@ -186,12 +186,26 @@ if ball_result.detected:
 1. **Close zone detection** (checked first)
    - Small focused area
    - Extra sensitive thresholds
+   - **NO MIRROR MASK** - Searches raw frame in rectangle
+   - Works even if zone extends outside mirror circle
    - Faster processing (smaller region)
 
 2. **Normal detection** (fallback)
    - Full mirror frame
+   - **Mirror mask applied** - Only searches inside mirror circle
    - Standard thresholds
    - Used if close zone finds nothing
+
+## Important: No Mirror Mask in Close Zone
+
+The close zone detection intentionally **does NOT apply the mirror mask**. This means:
+
+✅ **Zone can extend outside mirror** - Works even if dribbler area is outside mirror circle  
+✅ **Searches full rectangle** - No masking interference  
+✅ **More reliable** - Not affected by mirror detection accuracy  
+✅ **Dribbler-specific** - Designed for the specific area where ball is captured  
+
+This is different from normal detection which only searches inside the detected mirror circle.
 
 ## Visual Feedback
 

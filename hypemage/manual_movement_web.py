@@ -38,7 +38,7 @@ is_moving = False
 stop_event = Event()
 
 # Constants
-FIXED_SPEED = 0.5
+FIXED_SPEED = 0.05
 VIZ_SIZE = 640
 
 

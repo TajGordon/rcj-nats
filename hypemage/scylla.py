@@ -849,12 +849,8 @@ class Scylla:
     
     def state_chase_ball(self):
         """
-        Chase ball: Move directly towards the ball's position
-        
-        Approach:
-        1. Calculate angle to ball based on its position in the camera frame
-        2. Move in that direction at appropriate speed
-        3. Add rotation component to align with ball
+        Chase ball: Move directly towards the ball's position at fixed slow speed
+        Simple wrapper to move_robot_relative with ball angle
         """
         # Check for pause
         if self._is_paused:
@@ -866,9 +862,6 @@ class Scylla:
         ball = self.latest_camera_data.ball
         
         if ball.detected:
-            # Just continue chasing - no state transitions
-            pass
-            
             if self.motor_controller:
                 # Standard differential steering: move forward toward ball while rotating to align
                 # ball.angle: angle from forward direction in degrees (-180 to 180)

@@ -40,6 +40,7 @@ FIXED_SIZE = 600  # Fixed square size for visualization
 def create_full_frame_visualization(frame, camera_obj, ball_result=None):
     """
     Create visualization on the full frame with mirror mask and overlays
+    NO TEXT - all data displayed in HTML to avoid flip/rotation issues
     
     Args:
         frame: Original full camera frame
@@ -47,16 +48,14 @@ def create_full_frame_visualization(frame, camera_obj, ball_result=None):
         ball_result: BallDetectionResult if available
         
     Returns:
-        Full frame with visualizations overlaid
+        Full frame with visual overlays only (no text)
     """
     # Start with full frame copy
     viz = frame.copy()
     
     # Get mirror circle info
     if camera_obj.mirror_circle is None:
-        # No mirror detected - show error message
-        cv2.putText(viz, "NO MIRROR DETECTED", (viz.shape[1]//2 - 150, viz.shape[0]//2),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+        # No mirror detected - just return frame
         return viz
     
     center_x, center_y, radius = camera_obj.mirror_circle
@@ -102,14 +101,7 @@ def create_full_frame_visualization(frame, camera_obj, ball_result=None):
     cv2.line(viz, (forward_end_x, forward_end_y), (arrow1_x, arrow1_y), (255, 255, 0), 4)
     cv2.line(viz, (forward_end_x, forward_end_y), (arrow2_x, arrow2_y), (255, 255, 0), 4)
     
-    # Add forward direction label
-    label_offset = 30
-    label_x = int(forward_end_x + label_offset * math.cos(angle_rad))
-    label_y = int(forward_end_y + label_offset * math.sin(angle_rad))
-    cv2.putText(viz, f"FWD {forward_rotation}°", (label_x - 40, label_y),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-    
-    # Draw ball if detected
+    # Draw ball if detected (visual only, no text)
     if ball_result and ball_result.detected:
         ball_x = ball_result.center_x
         ball_y = ball_result.center_y
@@ -122,37 +114,6 @@ def create_full_frame_visualization(frame, camera_obj, ball_result=None):
         # Draw line from center to ball
         cv2.line(viz, (center_x, center_y), (ball_x, ball_y),
                 (0, 165, 255), 3)  # Orange line to ball
-        
-        # Calculate angle to ball
-        dx = ball_x - center_x
-        dy = ball_y - center_y
-        ball_angle = math.degrees(math.atan2(dy, dx)) + 90  # Convert to 0° = up
-        ball_angle = (ball_angle + 360) % 360  # Normalize to [0, 360)
-        distance = math.sqrt(dx*dx + dy*dy)
-        
-        # Draw ball info box
-        info_x = ball_x + ball_radius + 10
-        info_y = ball_y - ball_radius
-        
-        cv2.putText(viz, f"Ball: {ball_angle:.1f}°", (info_x, info_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
-        cv2.putText(viz, f"Dist: {distance:.0f}px", (info_x, info_y + 25),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
-        cv2.putText(viz, f"H-Err: {ball_result.horizontal_error:.2f}", (info_x, info_y + 50),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 165, 255), 2)
-    
-    # Draw info overlay at top
-    info_y = 25
-    cv2.putText(viz, f"Mirror: ({center_x}, {center_y}) R={radius}px", (10, info_y),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-    info_y += 30
-    cv2.putText(viz, f"Heading: {forward_rotation}°", (10, info_y),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-    
-    if ball_result and ball_result.detected:
-        info_y += 30
-        cv2.putText(viz, f"Ball Detected: Yes", (10, info_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 165, 255), 2)
     
     return viz
 

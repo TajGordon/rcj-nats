@@ -325,8 +325,12 @@ class CameraProcess:
         """
         Detect the circular mirror in the frame
         
+        CRITICAL: This function MUST receive the full original camera frame,
+        NOT a cropped version. Mirror detection requires the complete frame
+        to accurately locate the mirror circle.
+        
         Args:
-            frame: Input frame from camera (BGR)
+            frame: Input frame from camera (BGR) - MUST be full original frame
             
         Returns:
             Tuple of (center_x, center_y, radius) if detected, None otherwise
@@ -334,6 +338,19 @@ class CameraProcess:
         if not self.enable_mirror_detection:
             logger.debug("Mirror detection disabled, using fallback")
             return None
+        
+        # Validate frame is likely the full original frame
+        # This prevents accidentally passing cropped frames
+        height, width = frame.shape[:2]
+        if hasattr(self, '_expected_frame_size'):
+            exp_h, exp_w = self._expected_frame_size
+            if (width, height) != (exp_w, exp_h):
+                logger.warning(f"Frame size mismatch: got {width}x{height}, expected {exp_w}x{exp_h}. "
+                             f"Mirror detection may fail if frame is cropped!")
+        else:
+            # Store expected frame size on first run
+            self._expected_frame_size = (height, width)
+            logger.debug(f"Stored expected frame size: {width}x{height}")
         
         # Convert to grayscale for circle detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -423,8 +440,11 @@ class CameraProcess:
         """
         Update the mirror mask if needed (every N frames or if not yet detected)
         
+        IMPORTANT: This function ALWAYS uses the original full frame for detection
+        to prevent losing the mirror when it's already been detected.
+        
         Args:
-            frame: Current camera frame
+            frame: Current camera frame (MUST be the full original frame, not cropped)
         """
         # Only detect mirror periodically to save computation
         self.mirror_detection_counter += 1
@@ -434,10 +454,12 @@ class CameraProcess:
             
             self.mirror_detection_counter = 0
             
-            # Detect the mirror circle
+            # CRITICAL: Always detect from the original full frame
+            # This ensures we don't lose the mirror if detection temporarily fails
             detected_circle = self.detect_mirror_circle(frame)
             
             if detected_circle is not None:
+                # Successfully detected - update mirror circle
                 self.mirror_circle = detected_circle
                 center_x, center_y, radius = detected_circle
                 
@@ -465,8 +487,14 @@ class CameraProcess:
                 logger.info(f"Mirror updated: center=({center_x}, {center_y}), radius={radius}, "
                           f"crop=({x1},{y1},{x2},{y2}), new_frame_center=({self.frame_center_x}, {self.frame_center_y})")
             else:
-                # Mirror not detected, use fallback circular mask
-                if self.mirror_mask is None:
+                # Detection failed this time
+                if self.mirror_circle is not None:
+                    # We had a previous detection - KEEP IT, don't lose it!
+                    logger.debug(f"Mirror detection failed this frame, keeping previous detection: "
+                               f"center={self.mirror_circle[0:2]}, radius={self.mirror_circle[2]}")
+                    # Don't reset mirror_circle - keep using the last good detection
+                else:
+                    # Never detected before - use fallback circular mask
                     height, width = frame.shape[:2]
                     self.mirror_mask = np.zeros((height, width), dtype=np.uint8)
                     cv2.circle(self.mirror_mask, 
@@ -476,7 +504,7 @@ class CameraProcess:
                     # Set default crop region (no crop)
                     self.mirror_crop_region = (0, 0, width, height)
                     
-                    logger.warning(f"Mirror not detected, using fallback mask: "
+                    logger.warning(f"Mirror never detected, using fallback mask: "
                                  f"center=({self.mask_center_x}, {self.mask_center_y}), "
                                  f"radius={self.mask_radius}")
     

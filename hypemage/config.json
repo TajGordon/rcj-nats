@@ -37,7 +37,7 @@
         "enable": true,
         "center_x_offset": 0,
         "_comment_center_x_offset": "Horizontal offset from mirror center (pixels, positive=right)",
-        "center_y_offset": 80,
+        "center_y_offset": 40,
         "_comment_center_y_offset": "Vertical offset from mirror center (pixels, negative=up/forward)",
         "width": 50,
         "_comment_width": "Width of detection zone (pixels)",

@@ -81,9 +81,9 @@ def create_full_frame_visualization(frame, camera_obj, ball_result=None):
     # Convert to radians: 0° is up, clockwise positive
     angle_rad = math.radians(-90 + forward_rotation + 180)  # Match camera.py convention
     
-    # Make arrow shorter and spaced back from edge to not obscure ball
-    forward_length = int(radius * 0.5)  # Only 50% of radius, not extending to edge
-    forward_start_offset = int(radius * 0.1)  # Start 10% away from center
+    # Make arrow longer and more visible
+    forward_length = int(radius * 0.7)  # 70% of radius for better visibility
+    forward_start_offset = int(radius * 0.05)  # Start 5% away from center
     
     forward_start_x = int(center_x + forward_start_offset * math.cos(angle_rad))
     forward_start_y = int(center_y + forward_start_offset * math.sin(angle_rad))
@@ -92,10 +92,10 @@ def create_full_frame_visualization(frame, camera_obj, ball_result=None):
     
     # Draw thick forward direction line (spaced back from edges)
     cv2.line(viz, (forward_start_x, forward_start_y), (forward_end_x, forward_end_y), 
-             (255, 255, 0), 4)  # Cyan line for forward
+             (0, 255, 255), 5)  # Yellow line for forward direction
     
     # Draw arrow head
-    arrow_size = 15  # Slightly smaller arrow
+    arrow_size = 20  # Larger arrow for visibility
     arrow_angle1 = angle_rad + math.radians(150)
     arrow_angle2 = angle_rad - math.radians(150)
     arrow1_x = int(forward_end_x + arrow_size * math.cos(arrow_angle1))
@@ -103,8 +103,8 @@ def create_full_frame_visualization(frame, camera_obj, ball_result=None):
     arrow2_x = int(forward_end_x + arrow_size * math.cos(arrow_angle2))
     arrow2_y = int(forward_end_y + arrow_size * math.sin(arrow_angle2))
     
-    cv2.line(viz, (forward_end_x, forward_end_y), (arrow1_x, arrow1_y), (255, 255, 0), 4)
-    cv2.line(viz, (forward_end_x, forward_end_y), (arrow2_x, arrow2_y), (255, 255, 0), 4)
+    cv2.line(viz, (forward_end_x, forward_end_y), (arrow1_x, arrow1_y), (0, 255, 255), 5)
+    cv2.line(viz, (forward_end_x, forward_end_y), (arrow2_x, arrow2_y), (0, 255, 255), 5)
     
     # Draw close ball detection zone (dribbler area)
     if camera_obj.close_zone_enable:

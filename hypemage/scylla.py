@@ -628,7 +628,6 @@ class Scylla:
         
         # Get all state-specific variables (those starting with state name or common patterns)
         state_var_patterns = [
-            '_chase_',
             '_search_',
             '_square_',
             '_lineup_',
@@ -791,11 +790,12 @@ class Scylla:
     
     def state_chase_ball(self):
         """
-        Active state: chase the ball
+        Simplified chase ball: Move forward and steer towards the ball
         
-        Uses continuous feedback from camera to adjust movement dynamically.
-        The robot calculates the angle to the ball and moves in that direction,
-        adjusting speed based on distance and adding rotation for better alignment.
+        Simple approach:
+        1. Move forward at constant speed
+        2. Use differential steering to turn towards the ball
+        3. Ball position determines left/right steering
         """
         # Check for pause
         if self._is_paused:
@@ -807,98 +807,41 @@ class Scylla:
         ball = self.latest_camera_data.ball
         
         if ball.detected:
-            # Validate ball detection data
-            if not hasattr(ball, 'area') or ball.area <= 0:
-                logger.warning("Invalid ball detection data - area is zero or missing")
-                return
-            
             # Check if ball is close and centered - transition to lineup
             if ball.is_close_and_centered:
                 logger.info("Ball is close and centered - transitioning to lineup kick")
                 self.transition_to(State.LINEUP_KICK)
                 return
             
-            # Calculate angle to ball for movement
             if self.motor_controller:
-                # Calculate angle to ball using the ball's position relative to frame center
+                # Simple forward movement with differential steering
+                forward_speed = 0.05  # Constant forward speed
+                
+                # Use horizontal error for steering
                 # horizontal_error: -1 (left) to +1 (right)
-                # vertical_error: -1 (top) to +1 (bottom)
-                
-                # For robot-relative movement using move_robot_relative():
-                # - 0° = forward, 90° = right, 180° = back, 270° = left
-                # - horizontal_error: -1 (left) to +1 (right)
-                # - vertical_error: -1 (top/forward) to +1 (bottom/back)
-                
-                # Calculate angle to ball using atan2(x, y) where:
-                # - x = horizontal_error (left/right offset)
-                # - y = -vertical_error (forward/back offset, inverted because negative vertical_error = forward)
-                # This gives us the angle from the robot's perspective
-                raw_ball_angle = math.degrees(math.atan2(
-                    ball.horizontal_error,    # x: horizontal offset (-1 to +1)
-                    -ball.vertical_error      # y: vertical offset (inverted: -1 to +1)
-                ))
-                
-                # Normalize angle to 0-360° range for consistency
-                ball_angle_normalized = raw_ball_angle % 360
-                
-                # Smooth the angle using a moving average to reduce jitter
-                if not hasattr(self, '_chase_angle_history'):
-                    self._chase_angle_history = []
-                    self._chase_max_history = 5
-                
-                self._chase_angle_history.append(ball_angle_normalized)
-                if len(self._chase_angle_history) > self._chase_max_history:
-                    self._chase_angle_history.pop(0)
-                
-                # Calculate smoothed angle using circular mean to handle angle wrapping
-                # Convert to unit vectors, average, then convert back
-                avg_x = sum(math.cos(math.radians(a)) for a in self._chase_angle_history)
-                avg_y = sum(math.sin(math.radians(a)) for a in self._chase_angle_history)
-                ball_angle = math.degrees(math.atan2(avg_y, avg_x))
-                
-                # Ensure angle is in 0-360° range
-                ball_angle = ball_angle % 360
-                
-                # Use constant speed for ball chasing
-                speed = 0.05
-                
-                # Proportional rotation control for better alignment
-                # The more the ball is off-center horizontally, the more we rotate
-                horizontal_error = ball.horizontal_error
-                
-                # Use a proportional controller for alignment
-                # Positive horizontal_error = ball to the right, so we need to rotate right (positive rotation)
-                rotation_gain = 0.03  # Moderate gain for smooth alignment
-                rotation = horizontal_error * rotation_gain
+                # Positive = ball to the right, so turn right (positive rotation)
+                # Negative = ball to the left, so turn left (negative rotation)
+                steering_gain = 0.03  # How much to turn based on ball position
+                rotation = ball.horizontal_error * steering_gain
                 
                 # Clamp rotation to reasonable limits
-                max_rotation = 0.4
+                max_rotation = 0.05
                 rotation = max(-max_rotation, min(max_rotation, rotation))
                 
-                # If the ball is very off-center, reduce forward speed and prioritize rotation
-                if abs(horizontal_error) > 0.6:  # Ball is way off to the side
-                    speed *= 0.3  # Significantly slow down to rotate better
-                    rotation *= 1.5  # Increase rotation gain when far off-center
-                    logger.debug(f"Ball far off-center ({horizontal_error:.2f}), reducing speed and increasing rotation")
-                
-                # Move towards ball with continuous adjustment
+                # Move forward with steering
                 try:
                     self.motor_controller.move_robot_relative(
-                        angle=ball_angle,
-                        speed=speed,
+                        angle=0,  # Always move forward
+                        speed=forward_speed,
                         rotation=rotation
                     )
                     
-                    # Logging with detailed feedback
                     logger.info(
-                        f"Chasing ball: angle={ball_angle:.1f}° (raw={raw_ball_angle:.1f}°), "
-                        f"speed={speed:.2f}, rotation={rotation:.2f}, "
-                        f"h_err={horizontal_error:.2f}, v_err={ball.vertical_error:.2f}, "
-                        f"area={ball.area:.0f}"
+                        f"Chasing ball: forward={forward_speed:.2f}, "
+                        f"rotation={rotation:.2f}, h_err={ball.horizontal_error:.2f}"
                     )
                 except Exception as e:
                     logger.error(f"Error in motor control during ball chase: {e}")
-                    # Stop motors on error for safety
                     self.motor_controller.stop()
             else:
                 logger.warning("No motor controller available for ball chasing")
@@ -1097,11 +1040,6 @@ class Scylla:
         """Called when entering chase_ball state"""
         logger.info("Entering CHASE_BALL mode")
         
-        # Initialize tracking variables for adaptive control
-        self._chase_last_ball_angle = None
-        self._chase_angle_history = []  # Track recent angles for smoothing
-        self._chase_max_history = 5  # Number of frames to average
-        
         # Could send camera command to prioritize ball detection
         self.queues['camera_cmd'].put({'type': 'detect_ball'})
     
@@ -1111,14 +1049,6 @@ class Scylla:
         
         # Disable dribbler when exiting chase
         self.disable_dribbler()
-        
-        # Clean up tracking variables
-        if hasattr(self, '_chase_last_ball_angle'):
-            delattr(self, '_chase_last_ball_angle')
-        if hasattr(self, '_chase_angle_history'):
-            delattr(self, '_chase_angle_history')
-        if hasattr(self, '_chase_max_history'):
-            delattr(self, '_chase_max_history')
     
     def on_exit_search_ball(self):
         """Called when exiting search_ball state"""

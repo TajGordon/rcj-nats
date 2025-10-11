@@ -39,13 +39,13 @@
       "deadzone": 20
     },
     "movement": {
-      "default_speed": 0.6,
-      "max_speed": 1.0,
-      "rotation_speed": 0.4,
+      "default_speed": 0.05,
+      "max_speed": 0.1,
+      "rotation_speed": 0.05,
       "approach_slow_distance": 50
     },
-    "motor_addresses": [26, 27, 29, 25],
-    "_comment_motor_addresses": "Default motor I2C addresses (can be overridden per robot)",
+    "motor_addresses": "_AUTO_DETECT_",
+    "_comment_motor_addresses": "Motor addresses are auto-detected based on hostname. m7 (necron) uses [27,29,25,26]. f7 (storm) uses [28,30,26,27] via mapping: 25→26, 26→27, 27→28, 29→30. Set explicitly here or in robot-specific section to override auto-detection.",
     "motor_multipliers": [1.0, -1.0, -1.0, 1.0],
     "_comment_motor_multipliers": "Default motor direction multipliers (1.0 = normal, -1.0 = reversed). Order: [back_left, front_left, front_right, back_right]",
     "max_speed": 400000000,
@@ -98,6 +98,9 @@
   
   "storm": {
     "_comment": "Storm-specific configuration (f7.local, port 8080)",
+    
+    "motor_addresses": "_AUTO_DETECT_",
+    "_comment_motor_addresses": "Auto-detected as [28,30,26,27] for f7 (storm). Mapped from m7 base addresses via: 25→26, 26→27, 27→28, 29→30",
     
     "dribbler": {
       "address": 29,

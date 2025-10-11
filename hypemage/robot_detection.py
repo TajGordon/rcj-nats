@@ -4,7 +4,7 @@ Detects which robot is running and provides robot-specific configuration.
 """
 
 import socket
-from typing import Dict, List
+from typing import Dict, List, Optional
 from hypemage.logger import get_logger
 
 logger = get_logger(__name__)
@@ -35,7 +35,7 @@ def get_robot_name() -> str:
         return 'm7'
 
 
-def get_motor_addresses(robot_name: str = None) -> List[int]:
+def get_motor_addresses(robot_name: Optional[str] = None) -> List[int]:
     """
     Get motor I2C addresses for the current robot
     
@@ -79,7 +79,7 @@ def get_motor_addresses(robot_name: str = None) -> List[int]:
         return m7_addresses
 
 
-def get_dribbler_address(robot_name: str = None) -> int:
+def get_dribbler_address(robot_name: Optional[str] = None) -> int:
     """
     Get dribbler motor I2C address for the current robot
     
@@ -102,7 +102,7 @@ def get_dribbler_address(robot_name: str = None) -> int:
     return address
 
 
-def get_robot_config_overrides(robot_name: str = None) -> Dict:
+def get_robot_config_overrides(robot_name: Optional[str] = None) -> Dict:
     """
     Get robot-specific configuration overrides
     

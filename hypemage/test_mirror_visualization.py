@@ -190,7 +190,6 @@ async def index_handler(request):
             display: block;
             border-radius: 5px;
             background: #000;
-            transform: rotate(180deg) scaleX(-1);
         }
         .controls {
             background: #1a1a1a;
@@ -288,8 +287,22 @@ async def index_handler(request):
             <div class="status" id="status">
                 <div>Connection: <span id="wsStatus">Connecting...</span></div>
                 <div>FPS: <span id="fps">0</span></div>
-                <div>Mirror: <span id="mirrorInfo">Detecting...</span></div>
-                <div>Ball: <span id="ballInfo">Not detected</span></div>
+                <div style="margin-top: 15px; border-top: 1px solid #00ff88; padding-top: 10px;">
+                    <strong>🪞 Mirror:</strong><br>
+                    <span id="mirrorInfo">Detecting...</span>
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid #00ff88; padding-top: 10px;">
+                    <strong>⚽ Ball:</strong><br>
+                    <span id="ballInfo">Not detected</span>
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid #00ff88; padding-top: 10px;">
+                    <strong>🥅 Blue Goal:</strong><br>
+                    <span id="blueGoalInfo">Not detected</span>
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid #00ff88; padding-top: 10px;">
+                    <strong>🥅 Yellow Goal:</strong><br>
+                    <span id="yellowGoalInfo">Not detected</span>
+                </div>
             </div>
         </div>
         
@@ -350,12 +363,62 @@ async def index_handler(request):
                     drawImage('squareCanvas', data.frame_square);
                 }
                 
-                if (data.mirror_info) {
-                    document.getElementById('mirrorInfo').textContent = data.mirror_info;
+                // Display mirror info
+                if (data.mirror_detected && data.mirror) {
+                    const m = data.mirror;
+                    document.getElementById('mirrorInfo').innerHTML = 
+                        `✅ Detected<br>` +
+                        `Center: (${m.center_x}, ${m.center_y})<br>` +
+                        `Radius: ${m.radius}px<br>` +
+                        `Heading: ${m.heading}°`;
+                } else {
+                    document.getElementById('mirrorInfo').innerHTML = '❌ Not detected';
                 }
                 
-                if (data.ball_info) {
-                    document.getElementById('ballInfo').textContent = data.ball_info;
+                // Display ball info with distance and angle
+                if (data.ball_detected && data.ball) {
+                    const b = data.ball;
+                    document.getElementById('ballInfo').innerHTML = 
+                        `✅ Detected<br>` +
+                        `<strong>📏 Distance:</strong> ${b.distance}px<br>` +
+                        `<strong>🧭 Angle:</strong> ${b.angle}°<br>` +
+                        `Position: (${b.center_x}, ${b.center_y})<br>` +
+                        `Radius: ${b.radius}px<br>` +
+                        `H-Error: ${b.horizontal_error}<br>` +
+                        `V-Error: ${b.vertical_error}<br>` +
+                        `Close: ${b.is_close ? '✅' : '❌'} | Centered: ${b.is_centered ? '✅' : '❌'}`;
+                } else {
+                    document.getElementById('ballInfo').innerHTML = '❌ Not detected';
+                }
+                
+                // Display blue goal info with distance and angle
+                if (data.blue_goal_detected && data.blue_goal) {
+                    const g = data.blue_goal;
+                    document.getElementById('blueGoalInfo').innerHTML = 
+                        `✅ Detected<br>` +
+                        `<strong>📏 Distance:</strong> ${g.distance}px<br>` +
+                        `<strong>🧭 Angle:</strong> ${g.angle}°<br>` +
+                        `Position: (${g.center_x}, ${g.center_y})<br>` +
+                        `Size: ${g.width}×${g.height}px<br>` +
+                        `H-Error: ${g.horizontal_error}<br>` +
+                        `Centered: ${g.is_centered ? '✅' : '❌'}`;
+                } else {
+                    document.getElementById('blueGoalInfo').innerHTML = '❌ Not detected';
+                }
+                
+                // Display yellow goal info with distance and angle
+                if (data.yellow_goal_detected && data.yellow_goal) {
+                    const g = data.yellow_goal;
+                    document.getElementById('yellowGoalInfo').innerHTML = 
+                        `✅ Detected<br>` +
+                        `<strong>📏 Distance:</strong> ${g.distance}px<br>` +
+                        `<strong>🧭 Angle:</strong> ${g.angle}°<br>` +
+                        `Position: (${g.center_x}, ${g.center_y})<br>` +
+                        `Size: ${g.width}×${g.height}px<br>` +
+                        `H-Error: ${g.horizontal_error}<br>` +
+                        `Centered: ${g.is_centered ? '✅' : '❌'}`;
+                } else {
+                    document.getElementById('yellowGoalInfo').innerHTML = '❌ Not detected';
                 }
                 
                 // Update FPS
@@ -419,8 +482,9 @@ async def frame_broadcaster():
             # Update mirror mask
             camera.update_mirror_mask(frame)
             
-            # Detect ball
+            # Detect ball and goals
             ball_result = camera.detect_ball(frame)
+            blue_goal, yellow_goal = camera.detect_goals(frame)
             
             # Create original view with basic overlay
             original = frame.copy()
@@ -432,6 +496,13 @@ async def frame_broadcaster():
             # Create full frame visualization with all overlays
             full_viz = create_full_frame_visualization(frame, camera, ball_result)
             
+            # Rotate and flip images for proper orientation (forward=up, corrected mirror)
+            # 180° rotation + horizontal flip to match robot perspective
+            original = cv2.rotate(original, cv2.ROTATE_180)
+            original = cv2.flip(original, 1)  # Horizontal flip
+            full_viz = cv2.rotate(full_viz, cv2.ROTATE_180)
+            full_viz = cv2.flip(full_viz, 1)  # Horizontal flip
+            
             # Encode frames as JPEG
             _, orig_jpg = cv2.imencode('.jpg', original, [cv2.IMWRITE_JPEG_QUALITY, 85])
             _, viz_jpg = cv2.imencode('.jpg', full_viz, [cv2.IMWRITE_JPEG_QUALITY, 90])
@@ -440,22 +511,65 @@ async def frame_broadcaster():
             orig_b64 = base64.b64encode(orig_jpg).decode('utf-8')
             viz_b64 = base64.b64encode(viz_jpg).decode('utf-8')
             
-            # Prepare info strings
-            mirror_info = "Not detected"
-            if camera.mirror_circle:
-                cx, cy, r = camera.mirror_circle
-                mirror_info = f"Center: ({cx}, {cy}), Radius: {r}px, Heading: {camera.robot_forward_rotation}°"
-            
-            ball_info = "Not detected"
-            if ball_result.detected:
-                ball_info = f"Position: ({ball_result.center_x}, {ball_result.center_y}), Radius: {ball_result.radius:.0f}px, H-Error: {ball_result.horizontal_error:.2f}"
-            
+            # Prepare detailed data for HTML display
             data = {
                 'frame_original': orig_b64,
                 'frame_square': viz_b64,
-                'mirror_info': mirror_info,
-                'ball_info': ball_info
+                'mirror_detected': camera.mirror_circle is not None,
+                'ball_detected': ball_result.detected if ball_result else False,
+                'blue_goal_detected': blue_goal.detected,
+                'yellow_goal_detected': yellow_goal.detected,
             }
+            
+            # Mirror data
+            if camera.mirror_circle:
+                cx, cy, r = camera.mirror_circle
+                data['mirror'] = {
+                    'center_x': cx,
+                    'center_y': cy,
+                    'radius': r,
+                    'heading': camera.robot_forward_rotation
+                }
+            
+            # Ball data with distance and angle
+            if ball_result and ball_result.detected:
+                data['ball'] = {
+                    'center_x': ball_result.center_x,
+                    'center_y': ball_result.center_y,
+                    'radius': ball_result.radius,
+                    'distance': round(ball_result.distance, 1),
+                    'angle': round(ball_result.angle, 1),
+                    'horizontal_error': round(ball_result.horizontal_error, 3),
+                    'vertical_error': round(ball_result.vertical_error, 3),
+                    'is_close': ball_result.is_close,
+                    'is_centered': ball_result.is_centered_horizontally
+                }
+            
+            # Blue goal data with distance and angle
+            if blue_goal.detected:
+                data['blue_goal'] = {
+                    'center_x': blue_goal.center_x,
+                    'center_y': blue_goal.center_y,
+                    'width': blue_goal.width,
+                    'height': blue_goal.height,
+                    'distance': round(blue_goal.distance, 1),
+                    'angle': round(blue_goal.angle, 1),
+                    'horizontal_error': round(blue_goal.horizontal_error, 3),
+                    'is_centered': blue_goal.is_centered_horizontally
+                }
+            
+            # Yellow goal data with distance and angle
+            if yellow_goal.detected:
+                data['yellow_goal'] = {
+                    'center_x': yellow_goal.center_x,
+                    'center_y': yellow_goal.center_y,
+                    'width': yellow_goal.width,
+                    'height': yellow_goal.height,
+                    'distance': round(yellow_goal.distance, 1),
+                    'angle': round(yellow_goal.angle, 1),
+                    'horizontal_error': round(yellow_goal.horizontal_error, 3),
+                    'is_centered': yellow_goal.is_centered_horizontally
+                }
             
             # Broadcast to all connections
             for ws in list(active_connections):

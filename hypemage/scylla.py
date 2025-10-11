@@ -507,7 +507,6 @@ class Scylla:
         # from mproc.localization import start as loc_start
         
         # For now, a stub
-        print("Localization process would start here")
         # proc = self.ctx.Process(target=loc_start, args=(...))
         # proc.start()
         # self.processes['localization'] = proc
@@ -520,7 +519,6 @@ class Scylla:
             if self.processes['localization'].is_alive():
                 self.processes['localization'].terminate()
             del self.processes['localization']
-            print("Localization process stopped")
     
     def _poll_camera_data(self):
         """Get latest camera data from queue (non-blocking)"""

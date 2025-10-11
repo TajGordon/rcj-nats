@@ -90,8 +90,8 @@ def create_visualization(angle, speed, is_moving):
         lines = label.split('\n')
         for i, line in enumerate(lines):
             text_size = cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-            text_x = label_x - text_size[0] // 2
-            text_y = label_y + (i - 0.5) * 20
+            text_x = int(label_x - text_size[0] // 2)
+            text_y = int(label_y + (i - 0.5) * 20)
             
             # Draw shadow
             cv2.putText(viz, line, (text_x + 2, text_y + 2), 
@@ -128,8 +128,8 @@ def create_visualization(angle, speed, is_moving):
         # Draw angle text at center
         angle_text = f"{angle:.0f}°"
         text_size = cv2.getTextSize(angle_text, cv2.FONT_HERSHEY_BOLD, 1.5, 3)[0]
-        text_x = center_x - text_size[0] // 2
-        text_y = center_y + text_size[1] // 2
+        text_x = int(center_x - text_size[0] // 2)
+        text_y = int(center_y + text_size[1] // 2)
         
         # Draw shadow
         cv2.putText(viz, angle_text, (text_x + 3, text_y + 3), 

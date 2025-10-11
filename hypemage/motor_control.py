@@ -424,7 +424,7 @@ class MotorController:
             controller.move_robot_relative(-90, 0.3)     # Move right at 30% speed
             controller.move_robot_relative(45, 0.5, 0.2) # Move diagonal with slight rotation
         """
-        angle = 180 -angle
+        angle = 180 + angle
         # Convert angle to radians
         angle_rad = math.radians(angle)
         

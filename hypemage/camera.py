@@ -357,17 +357,31 @@ class CameraProcess:
         
         if self.mirror_detection_method == 'hough':
             # Use Hough Circle Transform for robust circle detection
-            # Apply Gaussian blur to reduce noise
-            blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+            # Optimized for detecting bright mirror against dark black plate
             
-            # Detect circles using Hough transform
+            # Step 1: Enhance contrast to emphasize bright mirror vs dark plate
+            # Use CLAHE (Contrast Limited Adaptive Histogram Equalization)
+            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
+            
+            # Step 2: Apply median filter to reduce noise while preserving edges
+            # Median filter is excellent for circular shapes
+            filtered = cv2.medianBlur(enhanced, 5)
+            
+            # Step 3: Optional - Apply morphological gradient to emphasize edges
+            # This highlights the boundary between bright mirror and dark plate
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+            gradient = cv2.morphologyEx(filtered, cv2.MORPH_GRADIENT, kernel)
+            
+            # Step 4: Detect circles using Hough transform on the gradient-enhanced image
+            # The sharp brightness transition (mirror→black plate) creates strong edges
             circles = cv2.HoughCircles(
-                blurred,
+                filtered,  # Use filtered image (better for bright/dark contrast)
                 cv2.HOUGH_GRADIENT,
-                dp=1,
+                dp=1,  # Inverse ratio of accumulator resolution
                 minDist=gray.shape[0] // 2,  # Minimum distance between circles (expect only 1 mirror)
-                param1=self.mirror_hough_param1,  # Canny edge detector high threshold
-                param2=self.mirror_hough_param2,  # Accumulator threshold for circle centers
+                param1=100,  # Canny edge detector high threshold (good for mirror/plate contrast)
+                param2=25,   # Accumulator threshold (lower = more permissive for circle centers)
                 minRadius=self.mirror_min_radius,
                 maxRadius=self.mirror_max_radius
             )
@@ -376,11 +390,74 @@ class CameraProcess:
                 # Convert to integer coordinates
                 circles = np.round(circles[0, :]).astype("int")
                 
-                # Take the largest circle (most likely the mirror)
+                if len(circles) > 1:
+                    logger.debug(f"Found {len(circles)} circles, selecting best one based on brightness contrast")
+                
+                # Evaluate circles based on brightness contrast at the perimeter
+                # The correct circle should have bright pixels inside, dark pixels outside
+                best_circle = None
+                best_score = -999999  # Can be negative if contrast is reversed
+                
+                for (x, y, r) in circles:
+                    # Sample points just inside and just outside the circle
+                    # Compare brightness: mirror (inside) should be brighter than plate (outside)
+                    contrast_score = 0
+                    num_samples = 36  # Sample every 10 degrees
+                    
+                    for angle in range(0, 360, 360 // num_samples):
+                        angle_rad = np.radians(angle)
+                        
+                        # Point just inside the circle (mirror)
+                        inside_offset = 5  # pixels inside
+                        px_in = int(x + (r - inside_offset) * np.cos(angle_rad))
+                        py_in = int(y + (r - inside_offset) * np.sin(angle_rad))
+                        
+                        # Point just outside the circle (black plate)
+                        outside_offset = 5  # pixels outside
+                        px_out = int(x + (r + outside_offset) * np.cos(angle_rad))
+                        py_out = int(y + (r + outside_offset) * np.sin(angle_rad))
+                        
+                        # Check bounds and sample brightness
+                        if (0 <= px_in < gray.shape[1] and 0 <= py_in < gray.shape[0] and
+                            0 <= px_out < gray.shape[1] and 0 <= py_out < gray.shape[0]):
+                            
+                            brightness_inside = int(enhanced[py_in, px_in])
+                            brightness_outside = int(enhanced[py_out, px_out])
+                            
+                            # Mirror should be brighter than black plate
+                            # Positive score = inside brighter than outside (correct)
+                            # Negative score = inside darker than outside (wrong)
+                            contrast_score += (brightness_inside - brightness_outside)
+                    
+                    # Normalize score by number of samples
+                    score = contrast_score / num_samples
+                    
+                    logger.debug(f"Circle at ({x}, {y}) r={r}: contrast_score={score:.2f} "
+                               f"(positive=mirror brighter than plate)")
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_circle = (x, y, r)
+                
+                if best_circle is not None and best_score > 0:
+                    # Only accept if mirror is actually brighter than surrounding
+                    center_x, center_y, radius = best_circle
+                    logger.info(f"Mirror detected (Hough with contrast scoring): center=({center_x}, {center_y}), "
+                              f"radius={radius}, contrast_score={best_score:.2f}")
+                    return (int(center_x), int(center_y), int(radius))
+                elif best_circle is not None:
+                    # Got a circle but contrast is wrong - still return it as fallback
+                    center_x, center_y, radius = best_circle
+                    logger.warning(f"Mirror detected but low contrast: center=({center_x}, {center_y}), "
+                                 f"radius={radius}, contrast_score={best_score:.2f} (expected positive)")
+                    return (int(center_x), int(center_y), int(radius))
+                
+                # Fallback: use largest circle if contrast scoring gave no clear winner
+                logger.debug("Contrast scoring inconclusive, using largest circle as fallback")
                 largest_circle = max(circles, key=lambda c: c[2])  # Sort by radius
                 center_x, center_y, radius = largest_circle
                 
-                logger.info(f"Mirror detected (Hough): center=({center_x}, {center_y}), radius={radius}")
+                logger.info(f"Mirror detected (Hough fallback): center=({center_x}, {center_y}), radius={radius}")
                 return (int(center_x), int(center_y), int(radius))
             else:
                 logger.debug("No mirror circle detected with Hough transform")

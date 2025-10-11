@@ -36,6 +36,7 @@ motor_controller = None
 active_connections = set()
 
 # Ball following state
+is_paused = True  # Start paused by default
 current_ball_angle = None
 current_movement_angle = None
 last_update_time = 0.0
@@ -54,6 +55,8 @@ stats = {
 
 async def websocket_handler(request):
     """Handle websocket connections"""
+    global is_paused
+    
     ws = web.WebSocketResponse()
     await ws.prepare(request)
     active_connections.add(ws)
@@ -62,7 +65,19 @@ async def websocket_handler(request):
     try:
         async for msg in ws:
             if msg.type == web.WSMsgType.TEXT:
-                pass  # No commands needed for this simple viewer
+                data = json.loads(msg.data)
+                
+                if data.get('type') == 'toggle_pause':
+                    is_paused = not is_paused
+                    state = "PAUSED" if is_paused else "RUNNING"
+                    logger.info(f"Ball following {state}")
+                    
+                    # Stop motors when pausing
+                    if is_paused and motor_controller:
+                        motor_controller.stop()
+                    
+                    await ws.send_json({'status': 'paused' if is_paused else 'running'})
+                    
     finally:
         active_connections.discard(ws)
         logger.info(f"Client disconnected. Total connections: {len(active_connections)}")
@@ -171,11 +186,55 @@ async def index_handler(request):
         }
         .status-on { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
         .status-off { background: #333; }
+        .controls {
+            background: #1a1a1a;
+            border: 2px solid #00ff88;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .control-button {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            border: none;
+            color: #000;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 18px;
+            margin: 10px;
+            transition: all 0.3s;
+            min-width: 150px;
+        }
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,255,136,0.4);
+        }
+        .control-button:active {
+            transform: translateY(0);
+        }
+        .control-button.paused {
+            background: linear-gradient(135deg, #ff8800, #cc6600);
+        }
+        .control-button.running {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>⚽ Ball Following Test Dashboard</h1>
+        
+        <div class="controls">
+            <h2>🎮 Controls</h2>
+            <button id="pauseButton" class="control-button paused" onclick="togglePause()">
+                ▶️ START FOLLOWING
+            </button>
+            <div id="pauseStatus" style="margin-top: 10px; font-size: 16px; color: #ff8800;">
+                ⏸ PAUSED - Click START to begin ball following
+            </div>
+        </div>
         
         <div class="main-view">
             <div class="view-box">
@@ -239,6 +298,32 @@ async def index_handler(request):
     
     <script>
         let ws = null;
+        let isPaused = true;  // Start paused
+        
+        function togglePause() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({type: 'toggle_pause'}));
+            }
+        }
+        
+        function updatePauseButton(paused) {
+            const button = document.getElementById('pauseButton');
+            const status = document.getElementById('pauseStatus');
+            
+            isPaused = paused;
+            
+            if (paused) {
+                button.className = 'control-button paused';
+                button.innerHTML = '▶️ START FOLLOWING';
+                status.innerHTML = '⏸ PAUSED - Click START to begin ball following';
+                status.style.color = '#ff8800';
+            } else {
+                button.className = 'control-button running';
+                button.innerHTML = '⏸ PAUSE FOLLOWING';
+                status.innerHTML = '▶️ RUNNING - Robot is following the ball';
+                status.style.color = '#00ff88';
+            }
+        }
         
         function log(message) {
             const logDiv = document.getElementById('debugLog');
@@ -281,6 +366,18 @@ async def index_handler(request):
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 
+                // Handle pause state response
+                if (data.status) {
+                    updatePauseButton(data.status === 'paused');
+                    log(data.status === 'paused' ? '⏸ PAUSED' : '▶️ RUNNING');
+                    return;
+                }
+                
+                // Update pause button state
+                if (data.is_paused !== undefined) {
+                    updatePauseButton(data.is_paused);
+                }
+                
                 // Update video frame
                 if (data.frame) {
                     drawImage(data.frame);
@@ -300,17 +397,17 @@ async def index_handler(request):
                 }
                 
                 // Update movement angle
-                if (data.movement_angle !== null) {
+                if (data.movement_angle !== null && !data.is_paused) {
                     document.getElementById('movementAngle').textContent = data.movement_angle.toFixed(1) + '°';
                     document.getElementById('movementAngle').style.color = '#00ff88';
                 } else {
-                    document.getElementById('movementAngle').textContent = 'STOPPED';
-                    document.getElementById('movementAngle').style.color = '#ff8800';
+                    document.getElementById('movementAngle').textContent = data.is_paused ? 'PAUSED' : 'STOPPED';
+                    document.getElementById('movementAngle').style.color = data.is_paused ? '#ff8800' : '#ff4444';
                 }
                 
                 // Update time until next update
                 const timeLeft = data.time_until_update.toFixed(1);
-                document.getElementById('nextUpdate').textContent = timeLeft + 's';
+                document.getElementById('nextUpdate').textContent = data.is_paused ? 'PAUSED' : timeLeft + 's';
                 
                 // Update stats
                 document.getElementById('framesProcessed').textContent = data.stats.frames_processed;
@@ -410,7 +507,7 @@ def draw_ball_following_overlay(frame, ball_result, movement_angle, time_until_u
 
 async def ball_following_loop():
     """Main ball following loop"""
-    global current_ball_angle, current_movement_angle, last_update_time, stats
+    global current_ball_angle, current_movement_angle, last_update_time, stats, is_paused
     
     print("Ball following loop started!")
     
@@ -419,16 +516,29 @@ async def ball_following_loop():
         print("Waiting for camera initialization...")
         await asyncio.sleep(0.5)
     
-    print("Camera ready! Starting ball following...")
+    print("Camera ready! Ball following paused by default - click START in web interface")
     
     last_ball_detected = False
+    last_pause_state = is_paused
     
     while True:
         try:
             # Get current time
             current_time = time.time()
             
-            # Capture frame
+            # Check if pause state changed
+            if is_paused != last_pause_state:
+                if is_paused:
+                    print("\n⏸ PAUSED - Stopping motors")
+                    current_movement_angle = None
+                    if motor_controller:
+                        motor_controller.stop()
+                else:
+                    print("\n▶️ RESUMED - Ball following active")
+                    last_update_time = current_time  # Reset timer when resuming
+                last_pause_state = is_paused
+            
+            # Capture frame (always capture, even when paused)
             frame = camera.capture_frame()
             if frame is None:
                 await asyncio.sleep(0.01)
@@ -439,62 +549,72 @@ async def ball_following_loop():
             # Update mirror mask
             camera.update_mirror_mask(frame)
             
-            # Detect ball
+            # Detect ball (always detect, even when paused)
             ball_result = camera.detect_ball(frame)
             
             direction_changed = False
             ball_lost = False
             
-            if ball_result and ball_result.detected:
-                stats['ball_detections'] += 1
-                stats['last_ball_seen'] = datetime.now().strftime('%H:%M:%S')
-                
-                current_ball_angle = ball_result.angle
-                
-                # Check if it's time to update movement direction
-                time_since_update = current_time - last_update_time
-                
-                if time_since_update >= UPDATE_INTERVAL:
-                    # Update movement direction
-                    old_angle = current_movement_angle
-                    current_movement_angle = ball_result.angle
-                    last_update_time = current_time
-                    stats['direction_changes'] += 1
-                    direction_changed = True
+            # Only update movement if NOT paused
+            if not is_paused:
+                if ball_result and ball_result.detected:
+                    stats['ball_detections'] += 1
+                    stats['last_ball_seen'] = datetime.now().strftime('%H:%M:%S')
                     
-                    print("\n" + "="*70)
-                    print(f"DIRECTION UPDATE #{stats['direction_changes']}")
-                    print("="*70)
-                    print(f"Time: {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
-                    print(f"Ball angle: {ball_result.angle:.2f}°")
-                    print(f"Ball distance: {ball_result.distance:.1f}px")
-                    print(f"Old movement angle: {old_angle}")
-                    print(f"New movement angle: {current_movement_angle:.2f}°")
-                    print(f"Speed: {MOVEMENT_SPEED}")
-                    print("="*70 + "\n")
+                    current_ball_angle = ball_result.angle
                     
-                    # Send movement command
-                    if motor_controller:
-                        motor_controller.move_robot_relative(
-                            angle=current_movement_angle, 
-                            speed=MOVEMENT_SPEED, 
-                            rotation=0.0
-                        )
-                
-                last_ball_detected = True
-                
-            else:
-                # Ball not detected
-                if last_ball_detected:
-                    # Just lost the ball
-                    print("\n⚠ BALL LOST - Stopping movement")
-                    current_movement_angle = None
-                    ball_lost = True
+                    # Check if it's time to update movement direction
+                    time_since_update = current_time - last_update_time
                     
-                    if motor_controller:
-                        motor_controller.stop()
+                    if time_since_update >= UPDATE_INTERVAL:
+                        # Update movement direction
+                        old_angle = current_movement_angle
+                        current_movement_angle = ball_result.angle
+                        last_update_time = current_time
+                        stats['direction_changes'] += 1
+                        direction_changed = True
+                        
+                        print("\n" + "="*70)
+                        print(f"DIRECTION UPDATE #{stats['direction_changes']}")
+                        print("="*70)
+                        print(f"Time: {datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
+                        print(f"Ball angle: {ball_result.angle:.2f}°")
+                        print(f"Ball distance: {ball_result.distance:.1f}px")
+                        print(f"Old movement angle: {old_angle}")
+                        print(f"New movement angle: {current_movement_angle:.2f}°")
+                        print(f"Speed: {MOVEMENT_SPEED}")
+                        print("="*70 + "\n")
+                        
+                        # Send movement command (keep sending to prevent watchdog timeout)
+                        if motor_controller:
+                            motor_controller.move_robot_relative(
+                                angle=current_movement_angle, 
+                                speed=MOVEMENT_SPEED, 
+                                rotation=0.0
+                            )
+                    else:
+                        # Keep sending the current movement command to prevent watchdog timeout
+                        if motor_controller and current_movement_angle is not None:
+                            motor_controller.move_robot_relative(
+                                angle=current_movement_angle, 
+                                speed=MOVEMENT_SPEED, 
+                                rotation=0.0
+                            )
                     
-                    last_ball_detected = False
+                    last_ball_detected = True
+                    
+                else:
+                    # Ball not detected
+                    if last_ball_detected:
+                        # Just lost the ball
+                        print("\n⚠ BALL LOST - Stopping movement")
+                        current_movement_angle = None
+                        ball_lost = True
+                        
+                        if motor_controller:
+                            motor_controller.stop()
+                        
+                        last_ball_detected = False
             
             # Calculate time until next update
             time_until_update = max(0, UPDATE_INTERVAL - (current_time - last_update_time))
@@ -522,10 +642,11 @@ async def ball_following_loop():
                 'ball_detected': ball_result.detected if ball_result else False,
                 'ball_angle': ball_result.angle if (ball_result and ball_result.detected) else None,
                 'ball_distance': ball_result.distance if (ball_result and ball_result.detected) else None,
-                'movement_angle': current_movement_angle,
+                'movement_angle': current_movement_angle if not is_paused else None,
                 'time_until_update': time_until_update,
-                'direction_changed': direction_changed,
+                'direction_changed': direction_changed and not is_paused,
                 'ball_lost': ball_lost,
+                'is_paused': is_paused,
                 'stats': {
                     'frames_processed': stats['frames_processed'],
                     'ball_detections': stats['ball_detections'],

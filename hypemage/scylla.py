@@ -887,17 +887,22 @@ class Scylla:
                 
                 base_speed = 0.07
                 
+                # Store the exact angle being used for movement
+                movement_angle = ball.angle
+                
                 # Move in the direction of the ball
                 try:
                     self.motor_controller.move_robot_relative(
-                        angle=ball.angle,  # Move directly towards ball angle
+                        angle=movement_angle,  # Move directly towards ball angle
                         speed=base_speed,
                         rotation=0.0  # No rotation, just move towards ball
                     )
                     
                     logger.info(
-                        f"Chasing ball: angle={ball.angle:.1f}°, distance={ball.distance:.1f}px, "
-                        f"speed={base_speed:.3f}, ball_pos=({ball.center_x}, {ball.center_y})"
+                        f"Chasing ball: USING_ANGLE={movement_angle:.1f}° (ball.angle={ball.angle:.1f}°) "
+                        f"distance={ball.distance:.1f}px speed={base_speed:.3f} "
+                        f"ball_pos=({ball.center_x}, {ball.center_y}) "
+                        f"h_err={ball.horizontal_error:.3f} frame_id={self.latest_camera_data.frame_id}"
                     )
                 except Exception as e:
                     logger.error(f"Error in motor control during ball chase: {e}")

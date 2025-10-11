@@ -874,11 +874,11 @@ class Scylla:
                 # Calculate rotation to align with ball
                 # ball.horizontal_error: -1.0 (far left) to +1.0 (far right)
                 # We want to turn toward the ball, so negative error = turn left (positive rotation)
-                rotation_gain = 0.06  # Increased for more responsive turning
+                rotation_gain = 0.03  # Increased for more responsive turning
                 rotation = -ball.horizontal_error * rotation_gain
                 
                 # Clamp rotation to prevent excessive spinning
-                max_rotation = 0.12
+                max_rotation = 0.04
                 rotation = max(-max_rotation, min(max_rotation, rotation))
                 
                 # Use differential steering: always move forward (0°) with rotation

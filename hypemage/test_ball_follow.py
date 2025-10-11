@@ -619,6 +619,7 @@ def main():
     print(f"  - Shows live debug visualization")
     print("="*70 + "\n")
     
+    input("Press Enter to start the server...")
     try:
         web.run_app(app, host='0.0.0.0', port=8084)
     except KeyboardInterrupt:

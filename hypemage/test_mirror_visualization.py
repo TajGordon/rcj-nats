@@ -81,16 +81,21 @@ def create_full_frame_visualization(frame, camera_obj, ball_result=None):
     # Convert to radians: 0° is up, clockwise positive
     angle_rad = math.radians(-90 + forward_rotation + 180)  # Match camera.py convention
     
-    forward_length = radius - 15
+    # Make arrow shorter and spaced back from edge to not obscure ball
+    forward_length = int(radius * 0.5)  # Only 50% of radius, not extending to edge
+    forward_start_offset = int(radius * 0.1)  # Start 10% away from center
+    
+    forward_start_x = int(center_x + forward_start_offset * math.cos(angle_rad))
+    forward_start_y = int(center_y + forward_start_offset * math.sin(angle_rad))
     forward_end_x = int(center_x + forward_length * math.cos(angle_rad))
     forward_end_y = int(center_y + forward_length * math.sin(angle_rad))
     
-    # Draw thick forward direction line
-    cv2.line(viz, (center_x, center_y), (forward_end_x, forward_end_y), 
+    # Draw thick forward direction line (spaced back from edges)
+    cv2.line(viz, (forward_start_x, forward_start_y), (forward_end_x, forward_end_y), 
              (255, 255, 0), 4)  # Cyan line for forward
     
     # Draw arrow head
-    arrow_size = 20
+    arrow_size = 15  # Slightly smaller arrow
     arrow_angle1 = angle_rad + math.radians(150)
     arrow_angle2 = angle_rad - math.radians(150)
     arrow1_x = int(forward_end_x + arrow_size * math.cos(arrow_angle1))

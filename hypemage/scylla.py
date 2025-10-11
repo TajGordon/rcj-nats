@@ -884,6 +884,28 @@ class Scylla:
                         rotation=0.0  # No rotation, just move towards ball
                     )
                     
+                    # Determine general direction for display
+                    if -22.5 <= movement_angle <= 22.5:
+                        direction = "FORWARD"
+                    elif 22.5 < movement_angle <= 67.5:
+                        direction = "FORWARD-LEFT"
+                    elif 67.5 < movement_angle <= 112.5:
+                        direction = "LEFT"
+                    elif 112.5 < movement_angle <= 157.5:
+                        direction = "BACK-LEFT"
+                    elif 157.5 < movement_angle or movement_angle <= -157.5:
+                        direction = "BACKWARD"
+                    elif -157.5 < movement_angle <= -112.5:
+                        direction = "BACK-RIGHT"
+                    elif -112.5 < movement_angle <= -67.5:
+                        direction = "RIGHT"
+                    elif -67.5 < movement_angle <= -22.5:
+                        direction = "FORWARD-RIGHT"
+                    else:
+                        direction = "UNKNOWN"
+                    
+                    print(f"[CHASE] Moving {direction} (angle={movement_angle:.1f}°)")
+                    
                     logger.info(
                         f"Chasing ball: angle={movement_angle:.1f}° "
                         f"distance={ball.distance:.1f}px speed={base_speed:.3f} "

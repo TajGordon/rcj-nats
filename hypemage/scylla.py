@@ -412,35 +412,6 @@ class Scylla:
     def _update(self):
         """Main update loop - runs every iteration"""
         try:
-            # Clear terminal at start of each frame - multiple methods for compatibility
-            import os
-            import subprocess
-            import sys
-            
-            # Method 1: ANSI escape sequence (works on most terminals)
-            print('\033[2J\033[H', end='', flush=True)
-            
-            # Method 2: Windows cls command
-            if os.name == 'nt':  # Windows
-                os.system('cls')
-            else:  # Unix/Linux/Mac
-                os.system('clear')
-            
-            # Method 3: Alternative ANSI sequences
-            print('\033c', end='', flush=True)
-            
-            # Method 4: Subprocess clear (works through SSH)
-            try:
-                subprocess.run(['clear'], check=False, capture_output=True)
-            except:
-                pass
-            
-            # Method 5: Windows alternative
-            try:
-                subprocess.run(['cls'], shell=True, check=False, capture_output=True)
-            except:
-                pass
-            
             current_time = time.time()
             state_cfg = self.STATE_CONFIGS[self.current_state]
             
@@ -931,7 +902,29 @@ class Scylla:
                     else:
                         direction = "UNKNOWN"
                     
-                    print(f"[CHASE] Moving {direction} (angle={movement_angle:.1f}°)")
+                    # Color codes for terminal output
+                    GREEN = '\033[92m'  # Bright green
+                    YELLOW = '\033[93m'  # Bright yellow
+                    BLUE = '\033[94m'   # Bright blue
+                    MAGENTA = '\033[95m'  # Bright magenta
+                    CYAN = '\033[96m'   # Bright cyan
+                    WHITE = '\033[97m'  # Bright white
+                    BOLD = '\033[1m'    # Bold
+                    RESET = '\033[0m'   # Reset to normal
+                    
+                    # Choose color based on direction
+                    if direction == "FORWARD":
+                        color = GREEN
+                    elif "LEFT" in direction:
+                        color = YELLOW
+                    elif "RIGHT" in direction:
+                        color = BLUE
+                    elif "BACK" in direction:
+                        color = MAGENTA
+                    else:
+                        color = CYAN
+                    
+                    print(f"{BOLD}{color}[CHASE] Moving {direction} (angle={movement_angle:.1f}°){RESET}")
                 except Exception as e:
                     self.motor_controller.stop()
             else:

@@ -905,17 +905,10 @@ class Scylla:
                         direction = "UNKNOWN"
                     
                     print(f"[CHASE] Moving {direction} (angle={movement_angle:.1f}°)")
-                    
-                    logger.info(
-                        f"Chasing ball: angle={movement_angle:.1f}° "
-                        f"distance={ball.distance:.1f}px speed={base_speed:.3f} "
-                        f"ball_pos=({ball.center_x}, {ball.center_y})"
-                    )
                 except Exception as e:
-                    logger.error(f"Error in motor control during ball chase: {e}")
                     self.motor_controller.stop()
             else:
-                logger.warning("No motor controller available for ball chasing")
+                pass
         else:
             # Ball not detected - do nothing, just wait
             # Keep dribbler on if last seen ball was close (might have it in dribbler)
@@ -1075,8 +1068,6 @@ class Scylla:
     
     def on_enter_chase_ball(self):
         """Called when entering chase_ball state"""
-        logger.info("Entering CHASE_BALL mode - simple chase behavior")
-        
         # Reset ball tracking state
         self._last_ball_was_close = False
         
@@ -1085,8 +1076,6 @@ class Scylla:
     
     def on_exit_chase_ball(self):
         """Called when exiting chase_ball state"""
-        logger.info("Exiting CHASE_BALL mode")
-        
         # Disable dribbler when exiting chase
         self.disable_dribbler()
     

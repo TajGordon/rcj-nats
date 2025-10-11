@@ -101,19 +101,38 @@ def create_full_frame_visualization(frame, camera_obj, ball_result=None):
     cv2.line(viz, (forward_end_x, forward_end_y), (arrow1_x, arrow1_y), (255, 255, 0), 4)
     cv2.line(viz, (forward_end_x, forward_end_y), (arrow2_x, arrow2_y), (255, 255, 0), 4)
     
+    # Draw close ball detection zone (dribbler area)
+    if camera_obj.close_zone_enable:
+        x1, y1, x2, y2 = camera_obj.get_close_zone_bounds()
+        # Draw rectangle for close zone
+        zone_color = (255, 0, 255) if (ball_result and ball_result.in_close_zone) else (128, 0, 128)  # Magenta if ball inside, purple otherwise
+        cv2.rectangle(viz, (x1, y1), (x2, y2), zone_color, 2)
+        # Draw corner markers for better visibility
+        corner_size = 8
+        cv2.line(viz, (x1, y1), (x1 + corner_size, y1), zone_color, 3)
+        cv2.line(viz, (x1, y1), (x1, y1 + corner_size), zone_color, 3)
+        cv2.line(viz, (x2, y1), (x2 - corner_size, y1), zone_color, 3)
+        cv2.line(viz, (x2, y1), (x2, y1 + corner_size), zone_color, 3)
+        cv2.line(viz, (x1, y2), (x1 + corner_size, y2), zone_color, 3)
+        cv2.line(viz, (x1, y2), (x1, y2 - corner_size), zone_color, 3)
+        cv2.line(viz, (x2, y2), (x2 - corner_size, y2), zone_color, 3)
+        cv2.line(viz, (x2, y2), (x2, y2 - corner_size), zone_color, 3)
+    
     # Draw ball if detected (visual only, no text)
     if ball_result and ball_result.detected:
         ball_x = ball_result.center_x
         ball_y = ball_result.center_y
         ball_radius = ball_result.radius
         
+        # Use different color if ball is in close zone
+        ball_color = (255, 0, 255) if ball_result.in_close_zone else (0, 165, 255)  # Magenta if in close zone, orange otherwise
+        
         # Draw ball circle
-        cv2.circle(viz, (ball_x, ball_y), ball_radius, (0, 165, 255), 3)  # Orange
-        cv2.circle(viz, (ball_x, ball_y), 3, (0, 165, 255), -1)
+        cv2.circle(viz, (ball_x, ball_y), ball_radius, ball_color, 3)
+        cv2.circle(viz, (ball_x, ball_y), 3, ball_color, -1)
         
         # Draw line from center to ball
-        cv2.line(viz, (center_x, center_y), (ball_x, ball_y),
-                (0, 165, 255), 3)  # Orange line to ball
+        cv2.line(viz, (center_x, center_y), (ball_x, ball_y), ball_color, 3)
     
     return viz
 
@@ -324,6 +343,14 @@ async def index_handler(request):
                 <div class="legend-color" style="background: #ffa500;"></div>
                 <span>Orange Line - Line from center to ball</span>
             </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ff00ff;"></div>
+                <span>Magenta Rectangle - Close ball zone (dribbler area, extra sensitive)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ff00ff;"></div>
+                <span>Magenta Ball - Ball detected in close zone</span>
+            </div>
         </div>
     </div>
     
@@ -378,8 +405,10 @@ async def index_handler(request):
                 // Display ball info with distance and angle
                 if (data.ball_detected && data.ball) {
                     const b = data.ball;
+                    const closeZoneBadge = b.in_close_zone ? '<strong style="color: #ff00ff;">🎯 IN DRIBBLER ZONE</strong><br>' : '';
                     document.getElementById('ballInfo').innerHTML = 
                         `✅ Detected<br>` +
+                        closeZoneBadge +
                         `<strong>📏 Distance:</strong> ${b.distance}px<br>` +
                         `<strong>🧭 Angle:</strong> ${b.angle}°<br>` +
                         `Position: (${b.center_x}, ${b.center_y})<br>` +
@@ -542,7 +571,8 @@ async def frame_broadcaster():
                     'horizontal_error': round(ball_result.horizontal_error, 3),
                     'vertical_error': round(ball_result.vertical_error, 3),
                     'is_close': ball_result.is_close,
-                    'is_centered': ball_result.is_centered_horizontally
+                    'is_centered': ball_result.is_centered_horizontally,
+                    'in_close_zone': ball_result.in_close_zone
                 }
             
             # Blue goal data with distance and angle

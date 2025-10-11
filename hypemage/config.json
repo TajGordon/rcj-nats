@@ -31,7 +31,23 @@
     "detection": {
       "proximity_threshold": 5000,
       "angle_tolerance": 15,
-      "goal_center_tolerance": 0.15
+      "goal_center_tolerance": 0.15,
+      "close_ball_zone": {
+        "_comment": "Extra sensitive zone for detecting ball when it's in/near dribbler",
+        "enable": true,
+        "center_x_offset": 0,
+        "_comment_center_x_offset": "Horizontal offset from mirror center (pixels, positive=right)",
+        "center_y_offset": -80,
+        "_comment_center_y_offset": "Vertical offset from mirror center (pixels, negative=up/forward)",
+        "width": 120,
+        "_comment_width": "Width of detection zone (pixels)",
+        "height": 80,
+        "_comment_height": "Height of detection zone (pixels)",
+        "min_ball_radius": 1,
+        "_comment_min_ball_radius": "Minimum ball radius in pixels (very sensitive, even 1px)",
+        "max_ball_area": 10000,
+        "_comment_max_ball_area": "Maximum ball area to avoid false positives"
+      }
     },
     "motors": {
       "max_speed": 255,

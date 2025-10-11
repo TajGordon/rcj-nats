@@ -70,6 +70,7 @@ class BallDetectionResult:
     is_close: bool = False
     is_centered_horizontally: bool = False
     is_close_and_centered: bool = False
+    in_close_zone: bool = False  # True if detected in the extra-sensitive close ball zone (dribbler area)
 
 
 @dataclass
@@ -179,6 +180,16 @@ class CameraProcess:
         detection_cfg = self.config.get('detection', {})
         self.proximity_threshold = detection_cfg.get("proximity_threshold", 5000)
         self.angle_tolerance = detection_cfg.get("angle_tolerance", 15)
+        
+        # Close ball zone parameters (extra sensitive detection near dribbler)
+        close_zone_cfg = detection_cfg.get("close_ball_zone", {})
+        self.close_zone_enable = close_zone_cfg.get("enable", True)
+        self.close_zone_center_x_offset = close_zone_cfg.get("center_x_offset", 0)
+        self.close_zone_center_y_offset = close_zone_cfg.get("center_y_offset", -80)
+        self.close_zone_width = close_zone_cfg.get("width", 120)
+        self.close_zone_height = close_zone_cfg.get("height", 80)
+        self.close_zone_min_radius = close_zone_cfg.get("min_ball_radius", 1)
+        self.close_zone_max_area = close_zone_cfg.get("max_ball_area", 10000)
         
         # Frame center
         cam_cfg = self.config['camera']
@@ -627,6 +638,23 @@ class CameraProcess:
             # Grayscale or binary image
             return cv2.bitwise_and(image, image, mask=self.mirror_mask)
     
+    def get_close_zone_bounds(self) -> Tuple[int, int, int, int]:
+        """
+        Get the bounds of the close ball detection zone for visualization
+        
+        Returns:
+            Tuple of (x1, y1, x2, y2) in full frame coordinates
+        """
+        zone_center_x = self.frame_center_x + self.close_zone_center_x_offset
+        zone_center_y = self.frame_center_y + self.close_zone_center_y_offset
+        
+        x1 = zone_center_x - self.close_zone_width // 2
+        x2 = zone_center_x + self.close_zone_width // 2
+        y1 = zone_center_y - self.close_zone_height // 2
+        y2 = zone_center_y + self.close_zone_height // 2
+        
+        return (x1, y1, x2, y2)
+    
     def detect_ball(self, frame) -> BallDetectionResult:
         """
         Detect orange ball in the frame using HSV color filtering
@@ -639,6 +667,13 @@ class CameraProcess:
         """
         # Update mirror mask if needed
         self.update_mirror_mask(frame)
+        
+        # First, try close zone detection (extra sensitive for dribbler area)
+        close_zone_result = self._detect_ball_in_close_zone(frame)
+        if close_zone_result.detected:
+            logger.info(f"Ball detected in CLOSE ZONE: pos=({close_zone_result.center_x}, {close_zone_result.center_y}) "
+                       f"radius={close_zone_result.radius} distance={close_zone_result.distance:.1f}px angle={close_zone_result.angle:.1f}°")
+            return close_zone_result
         
         # Apply mask to full frame (no cropping)
         masked_frame = self.crop_to_mirror(frame)
@@ -716,7 +751,104 @@ class CameraProcess:
             angle=angle,
             is_close=is_close,
             is_centered_horizontally=is_centered,
-            is_close_and_centered=is_close and is_centered
+            is_close_and_centered=is_close and is_centered,
+            in_close_zone=False
+        )
+    
+    def _detect_ball_in_close_zone(self, frame) -> BallDetectionResult:
+        """
+        Detect ball in the extra-sensitive close zone (dribbler area)
+        
+        This zone is positioned in front of the robot where the ball may be
+        partially obscured by the dribbler mechanism.
+        
+        Args:
+            frame: Input frame from camera (BGR from Picamera2) - full frame
+            
+        Returns:
+            BallDetectionResult with in_close_zone=True if detected, otherwise detected=False
+        """
+        if not self.close_zone_enable:
+            return BallDetectionResult(detected=False)
+        
+        # Calculate close zone bounds in full frame coordinates
+        zone_center_x = self.frame_center_x + self.close_zone_center_x_offset
+        zone_center_y = self.frame_center_y + self.close_zone_center_y_offset
+        
+        x1 = max(0, zone_center_x - self.close_zone_width // 2)
+        x2 = min(frame.shape[1], zone_center_x + self.close_zone_width // 2)
+        y1 = max(0, zone_center_y - self.close_zone_height // 2)
+        y2 = min(frame.shape[0], zone_center_y + self.close_zone_height // 2)
+        
+        # Extract close zone region
+        close_zone = frame[y1:y2, x1:x2]
+        
+        if close_zone.size == 0:
+            return BallDetectionResult(detected=False)
+        
+        # Convert to HSV
+        hsv_zone = cv2.cvtColor(close_zone, cv2.COLOR_BGR2HSV)
+        
+        # Create color mask for orange ball (same HSV range as regular detection)
+        mask_zone = cv2.inRange(hsv_zone, self.lower_orange, self.upper_orange)
+        
+        # Find contours
+        contours, _ = cv2.findContours(mask_zone, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        
+        if not contours:
+            return BallDetectionResult(detected=False)
+        
+        # Filter by area (extra permissive in close zone)
+        filtered_contours = [c for c in contours if cv2.contourArea(c) < self.close_zone_max_area]
+        
+        if not filtered_contours:
+            return BallDetectionResult(detected=False)
+        
+        # Get largest contour
+        largest_contour = max(filtered_contours, key=cv2.contourArea)
+        (x, y), radius = cv2.minEnclosingCircle(largest_contour)
+        
+        # Check minimum radius (very permissive)
+        if radius < self.close_zone_min_radius:
+            return BallDetectionResult(detected=False)
+        
+        # Convert coordinates back to full frame
+        center_x = int(x1 + x)
+        center_y = int(y1 + y)
+        radius = int(radius)
+        
+        # Calculate all the same metrics as regular detection
+        ball_area = math.pi * radius * radius
+        horizontal_error = (center_x - self.frame_center_x) / self.frame_center_x
+        vertical_error = (center_y - self.frame_center_y) / self.frame_center_y
+        
+        dx = center_x - self.frame_center_x
+        dy = center_y - self.frame_center_y
+        distance = math.sqrt(dx * dx + dy * dy)
+        
+        angle_rad = math.atan2(dx, -dy)
+        angle = math.degrees(angle_rad)
+        
+        is_close = ball_area >= self.proximity_threshold
+        is_centered = abs(horizontal_error) <= self.angle_tolerance
+        
+        logger.debug(f"Close zone detection: pos=({center_x}, {center_y}) radius={radius} "
+                    f"distance={distance:.1f}px angle={angle:.1f}°")
+        
+        return BallDetectionResult(
+            detected=True,
+            center_x=center_x,
+            center_y=center_y,
+            radius=radius,
+            area=ball_area,
+            horizontal_error=horizontal_error,
+            vertical_error=vertical_error,
+            distance=distance,
+            angle=angle,
+            is_close=is_close,
+            is_centered_horizontally=is_centered,
+            is_close_and_centered=is_close and is_centered,
+            in_close_zone=True
         )
     
     def detect_goals(self, frame) -> Tuple[GoalDetectionResult, GoalDetectionResult]:

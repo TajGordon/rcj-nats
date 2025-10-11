@@ -43,7 +43,7 @@ is_moving = False
 stop_event = Event()
 
 # Constants
-FIXED_SPEED = 0.05
+FIXED_SPEED = 0.025
 VIZ_SIZE = 640
 
 
@@ -184,26 +184,85 @@ async def websocket_handler(request):
                     canvas_width = data['width']
                     canvas_height = data['height']
                     
+                    print("\n" + "="*70)
+                    print("CLICK POSITION & ANGLE CALCULATION DEBUG")
+                    print("="*70)
+                    
                     # Convert to centered coordinates
                     center_x = canvas_width / 2
                     center_y = canvas_height / 2
                     dx = click_x - center_x
                     dy = click_y - center_y
                     
+                    print(f"Raw Click Position:")
+                    print(f"  click_x: {click_x:.2f}")
+                    print(f"  click_y: {click_y:.2f}")
+                    print(f"  canvas_width: {canvas_width}")
+                    print(f"  canvas_height: {canvas_height}")
+                    
+                    print(f"\nCentered Coordinates:")
+                    print(f"  center_x: {center_x:.2f}")
+                    print(f"  center_y: {center_y:.2f}")
+                    print(f"  dx (click_x - center_x): {dx:.2f}")
+                    print(f"  dy (click_y - center_y): {dy:.2f}")
+                    
                     # Calculate angle (atan2 gives angle from positive x-axis)
-                    # We need to rotate 90° to make 0° point up
                     angle_rad = np.arctan2(dy, dx)
-                    angle_deg = np.degrees(angle_rad) + 90
+                    angle_deg_raw = np.degrees(angle_rad)
+                    
+                    print(f"\nRaw Angle Calculation:")
+                    print(f"  angle_rad = atan2({dy:.2f}, {dx:.2f}) = {angle_rad:.4f} radians")
+                    print(f"  angle_deg_raw = {angle_deg_raw:.2f}°")
+                    
+                    # We need to rotate 90° to make 0° point up
+                    angle_deg = angle_deg_raw + 90
+                    
+                    print(f"\nAfter +90° Rotation (to make 0° point up):")
+                    print(f"  angle_deg = {angle_deg_raw:.2f}° + 90° = {angle_deg:.2f}°")
                     
                     # Normalize to 0-360
+                    angle_before_normalize = angle_deg
                     if angle_deg < 0:
                         angle_deg += 360
+                    
+                    print(f"\nNormalization to 0-360°:")
+                    print(f"  before normalize: {angle_before_normalize:.2f}°")
+                    print(f"  after normalize: {angle_deg:.2f}°")
+                    
+                    # Check if camera transformations apply
+                    if camera:
+                        print(f"\nCamera Information:")
+                        print(f"  camera.robot_forward_rotation: {camera.robot_forward_rotation}°")
+                        if hasattr(camera, 'mirror_circle') and camera.mirror_circle:
+                            cx, cy, r = camera.mirror_circle
+                            print(f"  mirror_circle center: ({cx}, {cy}), radius: {r}")
+                    
+                    # Check what angle the motor controller will receive
+                    print(f"\nAngle Sent to Motor Controller:")
+                    print(f"  final_angle: {angle_deg:.2f}°")
+                    print(f"  speed: {FIXED_SPEED}")
+                    print(f"  rotation: 0.0")
+                    
+                    if motor_controller:
+                        print(f"\nMotor Controller State:")
+                        print(f"  motor_controller exists: True")
+                        # Try to get motor info if available
+                        if hasattr(motor_controller, 'motors'):
+                            print(f"  motors available: {hasattr(motor_controller.motors, '__len__')}")
+                    else:
+                        print(f"\nMotor Controller State:")
+                        print(f"  motor_controller exists: False")
+                    
+                    print("="*70 + "\n")
                     
                     # Start movement
                     await start_movement(angle_deg)
                     
                 elif data['type'] == 'stop':
                     # Stop movement
+                    print("\n" + "="*70)
+                    print("STOP MOVEMENT COMMAND")
+                    print("="*70 + "\n")
                     await stop_movement()
                     
     except Exception as e:
@@ -226,6 +285,7 @@ async def start_movement(angle):
     logger.info(f"Starting movement: angle={angle:.1f}°, speed={FIXED_SPEED}")
     
     if motor_controller:
+        print(f"→ Calling motor_controller.move_robot_relative(angle={angle:.2f}, speed={FIXED_SPEED}, rotation=0.0)")
         motor_controller.move_robot_relative(angle=angle, speed=FIXED_SPEED, rotation=0.0)
 
 

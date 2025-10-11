@@ -445,9 +445,9 @@ class MotorController:
         back_right = vy + vx # - rotation
         
         # Apply 1.3x multiplier to right motors (front_right and back_right)
-        right_motor_multiplier = 1.2
+        right_motor_multiplier = 1.0
         front_right *= right_motor_multiplier
-        # back_right *= right_motor_multiplier
+        back_right *= right_motor_multiplier
         
         # Normalize to keep all speeds within [-1.0, 1.0]
         max_speed = max(abs(back_left), abs(front_left), abs(front_right), abs(back_right))

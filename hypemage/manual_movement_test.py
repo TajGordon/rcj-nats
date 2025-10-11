@@ -17,6 +17,7 @@ Usage:
 
 import sys
 import signal
+import time
 from hypemage.motor_control import MotorController
 from hypemage.config import load_config
 
@@ -108,6 +109,15 @@ def main():
                 # Show status
                 status = motor_controller.get_status()
                 print(f"  Motor speeds: {[f'{s:.2f}' for s in status.speeds]}")
+                
+                # Run movement for 2 seconds
+                print("  Running for 2 seconds...")
+                time.sleep(2.0)
+                
+                # Stop after 2 seconds
+                print("  Stopping motors")
+                motor_controller.stop()
+
                 
             except EOFError:
                 # Handle end of input (Ctrl+D on Unix)

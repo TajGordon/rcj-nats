@@ -181,7 +181,26 @@ class Scylla:
         Raises:
             SystemExit: If critical components fail to initialize
         """
+        # Apply robot-specific configuration overrides
+        from hypemage.robot_detection import get_robot_config_overrides
+        
         self.config = config or {}
+        
+        # Auto-detect robot and apply overrides
+        robot_overrides = get_robot_config_overrides()
+        logger.info(f"Detected robot: {robot_overrides['robot_name']}")
+        logger.info(f"Motor addresses: {robot_overrides['motor_addresses']}")
+        
+        # Merge robot-specific overrides into config
+        # Only override if not explicitly set in provided config
+        if 'motor_addresses' not in self.config or not self.config['motor_addresses']:
+            self.config['motor_addresses'] = robot_overrides['motor_addresses']
+        
+        if 'dribbler' not in self.config:
+            self.config['dribbler'] = {}
+        if 'address' not in self.config['dribbler']:
+            self.config['dribbler']['address'] = robot_overrides['dribbler']['address']
+        
         self.current_state = State.PAUSED
         self.previous_state = None
         

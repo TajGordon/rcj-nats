@@ -117,9 +117,15 @@ class MotorController:
             self.start_thread()
     
     def _default_config(self) -> Dict[str, Any]:
-        """Default motor configuration"""
+        """Default motor configuration with robot-specific motor addresses"""
+        # Import robot detection here to avoid circular imports
+        from hypemage.robot_detection import get_motor_addresses
+        
+        # Auto-detect motor addresses based on robot
+        motor_addresses = get_motor_addresses()
+        
         return {
-            'motor_addresses': [26, 27, 29, 25],  # Example addresses
+            'motor_addresses': motor_addresses,  # Auto-detected based on hostname
             'max_speed': 400_000_000,
             'current_limit_foc': 65536 * 3,
             'id_pid': {'kp': 1500, 'ki': 200},
@@ -155,8 +161,16 @@ class MotorController:
             self.i2c = busio.I2C(board.SCL, board.SDA)
             logger.info("I2C bus initialized")
             
+            # Get motor addresses - use config if provided, otherwise auto-detect
+            if 'motor_addresses' in self.config and self.config['motor_addresses']:
+                motor_addrs = self.config['motor_addresses']
+                logger.info(f"Using motor addresses from config: {motor_addrs}")
+            else:
+                from hypemage.robot_detection import get_motor_addresses
+                motor_addrs = get_motor_addresses()
+                logger.info(f"Auto-detected motor addresses: {motor_addrs}")
+            
             # Initialize each motor
-            motor_addrs = self.config['motor_addresses']
             for i, addr in enumerate(motor_addrs):
                 try:
                     motor = PowerfulBLDCDriver(self.i2c, addr)

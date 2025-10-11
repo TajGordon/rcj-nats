@@ -104,15 +104,18 @@ def main():
                 
                 # Execute movement
                 print(f"→ Moving: angle={angle}°, speed={speed:.2f}")
-                motor_controller.move_robot_relative(angle=angle, speed=speed, rotation=0.0)
                 
                 # Show status
                 status = motor_controller.get_status()
-                print(f"  Motor speeds: {[f'{s:.2f}' for s in status.speeds]}")
+                print(f"  Motor speeds before: {[f'{s:.2f}' for s in status.speeds]}")
                 
                 # Run movement for 2 seconds
-                print("  Running for 2 seconds...")
-                time.sleep(10)
+                # Note: We need to keep sending commands to prevent watchdog timeout (0.5s default)
+                print("  Running for 2 seconds (sending commands every 0.2s to prevent watchdog timeout)...")
+                start_time = time.time()
+                while (time.time() - start_time) < 2.0:
+                    motor_controller.move_robot_relative(angle=angle, speed=speed, rotation=0.0)
+                    time.sleep(0.2)  # Send command every 200ms (faster than 500ms watchdog timeout)
                 
                 # Stop after 2 seconds
                 print("  Stopping motors")

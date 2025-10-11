@@ -40,7 +40,7 @@ current_ball_angle = None
 current_movement_angle = None
 last_update_time = 0.0
 UPDATE_INTERVAL = 2.0  # Update direction every 2 seconds
-MOVEMENT_SPEED = 50
+MOVEMENT_SPEED = 0.05
 
 # Debug stats
 stats = {

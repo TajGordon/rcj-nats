@@ -27,7 +27,7 @@ import cv2
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from hypemage.motor_control import MotorController
-from hypemage.config import load_config
+from hypemage.config import load_config, get_robot_id
 from hypemage.logger import get_logger
 from hypemage.camera import CameraProcess
 
@@ -583,18 +583,21 @@ def main():
     print("Manual Movement Control - Web Interface")
     print("=" * 60)
     
-    # Load config
-    config = load_config()
+    # Load config with robot ID
+    robot_id = get_robot_id()
+    config = load_config(robot_id)
     
-    # Initialize camera
+    print(f"\nRobot ID: {robot_id}")
+    print(f"Mirror detection: {config.get('mirror', {}).get('enable', True)}")
+    
+    # Initialize camera (same as mirror visualization)
     print("\nInitializing camera...")
     try:
-        camera = CameraProcess(config=config, threaded=False)
-        print("✓ Camera initialized")
+        camera = CameraProcess(config)
+        print("✓ Camera initialized successfully")
     except Exception as e:
         print(f"✗ Failed to initialize camera: {e}")
-        print("Cannot continue without camera")
-        sys.exit(1)
+        return 1
     
     # Initialize motor controller
     print("\nInitializing motor controller...")
@@ -604,7 +607,7 @@ def main():
     except Exception as e:
         print(f"✗ Failed to initialize motors: {e}")
         print("Cannot continue without motors")
-        sys.exit(1)
+        return 1
     
     # Register signal handler for Ctrl+C
     signal.signal(signal.SIGINT, signal_handler)
@@ -629,11 +632,17 @@ def main():
     except KeyboardInterrupt:
         print("\nShutting down...")
     finally:
+        if camera:
+            print("\nStopping camera...")
+            camera.stop()
+            print("✓ Camera stopped")
         if motor_controller:
-            print("\nShutting down motor controller...")
+            print("Shutting down motor controller...")
             motor_controller.shutdown()
             print("✓ Shutdown complete")
+    
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

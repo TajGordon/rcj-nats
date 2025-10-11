@@ -929,7 +929,7 @@ class Scylla:
                 # Move in the direction of the ball
                 try:
                     self.motor_controller.move_robot_relative(
-                        angle=180 + movement_angle,  # Move directly towards ball angle
+                        angle=-180 - movement_angle,  # Move directly towards ball angle
                         speed=base_speed,
                         rotation=0.0  # No rotation, just move towards ball
                     )

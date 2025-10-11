@@ -864,18 +864,24 @@ class Scylla:
         if ball.detected:
             if self.motor_controller:
                 # Simple movement: just move towards the ball at fixed slow speed
-                # ball.angle: angle from forward direction in degrees (-180 to 180)
-                # 0° = forward (up in mirror), 90° = right, -90° = left, ±180° = backward
+                # ball.angle is calculated from camera's upward direction, but we need it
+                # relative to robot's forward direction. Since robot_forward_rotation=0 but
+                # the angle appears to be 180° off, we need to invert it.
+                # Corrected angle: add 180° to flip the direction, then normalize to -180 to 180
+                corrected_angle = ball.angle + 180.0
+                if corrected_angle > 180.0:
+                    corrected_angle -= 360.0
+                
                 try:
                     self.motor_controller.move_robot_relative(
-                        angle=ball.angle,
+                        angle=corrected_angle,
                         speed=0.05,
                         rotation=0.0
                     )
                     
                     logger.info(
-                        f"Chasing ball: angle={ball.angle:.1f}°, distance={ball.distance:.1f}px, "
-                        f"ball_pos=({ball.center_x}, {ball.center_y})"
+                        f"Chasing ball: raw_angle={ball.angle:.1f}° corrected_angle={corrected_angle:.1f}° "
+                        f"distance={ball.distance:.1f}px ball_pos=({ball.center_x}, {ball.center_y})"
                     )
                 except Exception as e:
                     logger.error(f"Error in motor control during ball chase: {e}")

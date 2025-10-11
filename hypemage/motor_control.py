@@ -425,6 +425,10 @@ class MotorController:
             controller.move_robot_relative(45, 0.5, 0.2) # Move diagonal with slight rotation
         """
         angle = 180 + angle
+        if angle > 360:
+            angle -= 360
+        elif angle < 0:
+            angle += 360
         # Convert angle to radians
         angle_rad = math.radians(angle)
         

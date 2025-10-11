@@ -1239,5 +1239,6 @@ if __name__ == '__main__':
     # Create and start the FSM
     scylla = Scylla(config=config)
     # Start in ball chasing mode to actively seek and move towards the ball
-    scylla.transition_to(State.CHASE_BALL)  # Start chasing the ball
+    # scylla.transition_to(State.CHASE_BALL)  # Start chasing the ball
+    scylla.transition_to(State.MOVE_STRAIGHT)  # Start chasing the ball
     scylla.start()

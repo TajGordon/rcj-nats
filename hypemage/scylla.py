@@ -849,12 +849,12 @@ class Scylla:
     
     def state_chase_ball(self):
         """
-        Simplified chase ball: Move forward and steer towards the ball
+        Chase ball: Move directly towards the ball's position
         
-        Simple approach:
-        1. Move forward at constant speed
-        2. Use differential steering to turn towards the ball
-        3. Ball position determines left/right steering
+        Approach:
+        1. Calculate angle to ball based on its position in the camera frame
+        2. Move in that direction at appropriate speed
+        3. Add rotation component to align with ball
         """
         # Check for pause
         if self._is_paused:
@@ -873,31 +873,42 @@ class Scylla:
                 return
             
             if self.motor_controller:
-                # Simple forward movement with differential steering
-                forward_speed = 0.05  # Constant forward speed
-                
-                # Use horizontal error for steering
+                # Calculate angle to ball based on its position in camera frame
+                # The camera sees in polar coordinates from robot center
                 # horizontal_error: -1 (left) to +1 (right)
-                # When ball is to the right (+), we need negative rotation to turn right
-                # When ball is to the left (-), we need positive rotation to turn left
-                steering_gain = 0.03  # How much to turn based on ball position
-                rotation = -ball.horizontal_error * steering_gain  # Inverted to fix direction
+                # Convert horizontal error to angle in degrees
+                # -1 (far left) = -90°, 0 (center) = 0°, +1 (far right) = +90°
+                ball_angle_from_center = ball.horizontal_error * 90.0  # Maps to [-90, +90]
                 
-                # Clamp rotation to reasonable limits
-                max_rotation = 0.05
+                # Robot coordinate system: 0° = forward, 90° = right, -90° = left
+                # So ball_angle is already in robot coordinates
+                
+                # Determine speed based on how far off-center the ball is
+                # If ball is centered, move faster; if off to side, move slower to allow turning
+                alignment_factor = 1.0 - abs(ball.horizontal_error)  # 1.0 when centered, 0.0 when at edge
+                base_speed = 0.05
+                speed = base_speed * (0.3 + 0.7 * alignment_factor)  # 30%-100% of base speed
+                
+                # Add rotation component to help align with ball
+                rotation_gain = 0.04
+                rotation = -ball.horizontal_error * rotation_gain  # Negative to turn towards ball
+                
+                # Clamp rotation
+                max_rotation = 0.08
                 rotation = max(-max_rotation, min(max_rotation, rotation))
                 
-                # Move forward with steering
+                # Move towards the ball's angle
                 try:
                     self.motor_controller.move_robot_relative(
-                        angle=0,  # Always move forward
-                        speed=forward_speed,
+                        angle=ball_angle_from_center,  # Move towards ball's position
+                        speed=speed,
                         rotation=rotation
                     )
                     
                     logger.info(
-                        f"Chasing ball: forward={forward_speed:.2f}, "
-                        f"rotation={rotation:.2f}, h_err={ball.horizontal_error:.2f}"
+                        f"Chasing ball: angle={ball_angle_from_center:.1f}°, speed={speed:.3f}, "
+                        f"rotation={rotation:.3f}, h_err={ball.horizontal_error:.2f}, "
+                        f"ball_pos=({ball.center_x}, {ball.center_y})"
                     )
                 except Exception as e:
                     logger.error(f"Error in motor control during ball chase: {e}")

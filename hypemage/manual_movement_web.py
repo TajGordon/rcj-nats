@@ -127,22 +127,22 @@ def create_visualization(angle, speed, is_moving):
         
         # Draw angle text at center
         angle_text = f"{angle:.0f}°"
-        text_size = cv2.getTextSize(angle_text, cv2.FONT_HERSHEY_BOLD, 1.5, 3)[0]
+        text_size = cv2.getTextSize(angle_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3)[0]
         text_x = int(center_x - text_size[0] // 2)
         text_y = int(center_y + text_size[1] // 2)
         
         # Draw shadow
         cv2.putText(viz, angle_text, (text_x + 3, text_y + 3), 
-                   cv2.FONT_HERSHEY_BOLD, 1.5, (0, 0, 0), 5, cv2.LINE_AA)
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 5, cv2.LINE_AA)
         # Draw text
         cv2.putText(viz, angle_text, (text_x, text_y), 
-                   cv2.FONT_HERSHEY_BOLD, 1.5, (0, 165, 255), 3, cv2.LINE_AA)
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 165, 255), 3, cv2.LINE_AA)
     
     # Draw status text
     status_text = "MOVING" if is_moving else "STOPPED"
     status_color = (0, 255, 0) if is_moving else (100, 100, 100)
     cv2.putText(viz, status_text, (20, 40), 
-               cv2.FONT_HERSHEY_BOLD, 1.2, status_color, 3, cv2.LINE_AA)
+               cv2.FONT_HERSHEY_SIMPLEX, 1.2, status_color, 3, cv2.LINE_AA)
     
     # Draw speed text
     speed_text = f"Speed: {speed:.2f}"

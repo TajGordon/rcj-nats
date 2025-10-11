@@ -854,10 +854,10 @@ class Scylla:
                 # Convert to unit vectors, average, then convert back
                 avg_x = sum(math.cos(math.radians(a)) for a in self._chase_angle_history)
                 avg_y = sum(math.sin(math.radians(a)) for a in self._chase_angle_history)
-                ball_angle = math.degrees(math.atan2(avg_y, avg_x))
+                ball_angle_raw = math.degrees(math.atan2(avg_y, avg_x))
                 
-                # Ensure angle is in 0-360° range
-                ball_angle = ball_angle % 360
+                # FIX: Add 180° to flip direction (robot was going opposite direction)
+                ball_angle = (ball_angle_raw + 180) % 360
                 
                 # Use constant speed for ball chasing
                 speed = 0.05

@@ -224,6 +224,9 @@ class Scylla:
         self.latest_localization_data = None
         self.latest_button_input = None
         
+        # Chase ball tracking
+        self._frames_without_ball = 0  # Counter for frames without ball detection
+        
         # Timing
         self.last_update_time = 0.0
         
@@ -849,8 +852,9 @@ class Scylla:
     
     def state_chase_ball(self):
         """
-        Chase ball: Move directly towards the ball's position at fixed slow speed
+        Chase ball: Move directly towards the ball's position at fixed speed
         Simple wrapper to move_robot_relative with ball angle
+        Only transitions to search after losing ball for 10+ frames
         """
         # Check for pause
         if self._is_paused:
@@ -862,14 +866,17 @@ class Scylla:
         ball = self.latest_camera_data.ball
         
         if ball.detected:
+            # Reset counter when ball is detected
+            self._frames_without_ball = 0
+            
             if self.motor_controller:
                 # Standard differential steering: move forward toward ball while rotating to align
                 # ball.angle: angle from forward direction in degrees (-180 to 180)
                 # 0° = forward (up in mirror), 90° = right, -90° = left, ±180° = backward
                 # ball.distance: distance from mirror center in pixels
                 
-                # Base forward speed - move toward ball at constant speed
-                base_speed = 0.05  # Slow speed like before
+                # Base forward speed - doubled from 0.05 to 0.10
+                base_speed = 0.10
                 
                 # Calculate rotation to align with ball
                 # ball.horizontal_error: -1.0 (far left) to +1.0 (far right)
@@ -900,10 +907,23 @@ class Scylla:
             else:
                 logger.warning("No motor controller available for ball chasing")
         else:
-            # Lost ball - just stop and wait for ball to reappear
-            logger.info("Ball lost during chase - stopping and waiting")
-            if self.motor_controller:
-                self.motor_controller.stop()
+            # Ball not detected - increment counter
+            self._frames_without_ball += 1
+            
+            # Only transition to search after 10+ frames without ball
+            if self._frames_without_ball >= 10:
+                logger.info(f"Ball lost for {self._frames_without_ball} frames - transitioning to search")
+                self._frames_without_ball = 0  # Reset counter
+                self.transition_to(State.SEARCH_BALL)
+            else:
+                # Keep moving forward while briefly losing ball
+                logger.debug(f"Ball not detected (frame {self._frames_without_ball}/10), continuing forward")
+                if self.motor_controller:
+                    self.motor_controller.move_robot_relative(
+                        angle=0,
+                        speed=0.10,
+                        rotation=0.0
+                    )
     
     def state_defend_goal(self):
         """Defensive positioning"""
@@ -1094,6 +1114,9 @@ class Scylla:
     def on_enter_chase_ball(self):
         """Called when entering chase_ball state"""
         logger.info("Entering CHASE_BALL mode")
+        
+        # Reset ball tracking counter
+        self._frames_without_ball = 0
         
         # Could send camera command to prioritize ball detection
         self.queues['camera_cmd'].put({'type': 'detect_ball'})

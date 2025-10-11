@@ -112,7 +112,7 @@ def main():
                 
                 # Run movement for 2 seconds
                 print("  Running for 2 seconds...")
-                time.sleep(2.0)
+                time.sleep(10)
                 
                 # Stop after 2 seconds
                 print("  Stopping motors")

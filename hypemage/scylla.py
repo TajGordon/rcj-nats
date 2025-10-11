@@ -887,7 +887,7 @@ class Scylla:
                 # ball.distance: distance from mirror center in pixels
                 
                 # Base forward speed - doubled from 0.05 to 0.10
-                base_speed = 0.10
+                base_speed = 0.07
                 
                 # Calculate rotation to align with ball
                 # ball.horizontal_error: -1.0 (far left) to +1.0 (far right)
@@ -937,7 +937,7 @@ class Scylla:
                 if self.motor_controller:
                     self.motor_controller.move_robot_relative(
                         angle=0,
-                        speed=0.10,
+                        speed=0.07,
                         rotation=0.0
                     )
     

@@ -728,10 +728,17 @@ class CameraProcess:
         
         # Calculate angle from forward direction (degrees)
         # Note: In image coordinates, y increases downward
-        # Forward direction is upward in the mirror (negative y direction)
-        # Angle is calculated as: 0° = forward (up), 90° = right, -90° = left, ±180° = backward
+        # Camera's "up" direction (-Y) is 180° opposite to robot's forward direction
+        # So we calculate angle from upward, then add 180° to align with robot's forward
+        # Result: 0° = robot forward, 90° = right, -90° = left, ±180° = backward
         angle_rad = math.atan2(dx, -dy)  # atan2(x, -y) gives angle from upward direction
         angle = math.degrees(angle_rad)  # Convert to degrees (-180 to 180)
+        
+        # Add 180° offset to align camera orientation with robot's forward direction
+        angle = angle + 180.0
+        # Normalize to -180 to 180 range
+        if angle > 180.0:
+            angle -= 360.0
         
         is_close = ball_area >= self.proximity_threshold
         is_centered = abs(horizontal_error) <= self.angle_tolerance
@@ -830,8 +837,15 @@ class CameraProcess:
         dy = center_y - self.frame_center_y
         distance = math.sqrt(dx * dx + dy * dy)
         
+        # Calculate angle with 180° offset for robot's forward direction
         angle_rad = math.atan2(dx, -dy)
         angle = math.degrees(angle_rad)
+        
+        # Add 180° offset to align camera orientation with robot's forward direction
+        angle = angle + 180.0
+        # Normalize to -180 to 180 range
+        if angle > 180.0:
+            angle -= 360.0
         
         is_close = ball_area >= self.proximity_threshold
         is_centered = abs(horizontal_error) <= self.angle_tolerance
@@ -928,11 +942,17 @@ class CameraProcess:
         distance = math.sqrt(dx * dx + dy * dy)
         
         # Calculate angle from forward direction (degrees)
-        # Note: In image coordinates, y increases downward
-        # Forward direction is upward in the mirror (negative y direction)
-        # Angle is calculated as: 0° = forward (up), 90° = right, -90° = left, ±180° = backward
+        # Camera's "up" direction (-Y) is 180° opposite to robot's forward direction
+        # So we calculate angle from upward, then add 180° to align with robot's forward
+        # Result: 0° = robot forward, 90° = right, -90° = left, ±180° = backward
         angle_rad = math.atan2(dx, -dy)  # atan2(x, -y) gives angle from upward direction
         angle = math.degrees(angle_rad)  # Convert to degrees (-180 to 180)
+        
+        # Add 180° offset to align camera orientation with robot's forward direction
+        angle = angle + 180.0
+        # Normalize to -180 to 180 range
+        if angle > 180.0:
+            angle -= 360.0
         
         return GoalDetectionResult(
             detected=True,

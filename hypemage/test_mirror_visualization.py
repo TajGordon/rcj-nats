@@ -667,6 +667,15 @@ async def frame_broadcaster():
     """Continuously capture and broadcast frames"""
     global camera
     
+    print("Frame broadcaster started!")
+    
+    # Wait for camera to be initialized
+    while camera is None:
+        print("Waiting for camera initialization...")
+        await asyncio.sleep(0.5)
+    
+    print("Camera is ready, starting frame broadcast!")
+    
     while True:
         try:
             if not active_connections:
@@ -813,8 +822,18 @@ def main():
     try:
         camera = CameraProcess(config)
         print("✓ Camera initialized successfully")
+        
+        # Test camera capture
+        test_frame = camera.capture_frame()
+        if test_frame is None:
+            print("⚠ Warning: Camera not capturing frames yet")
+        else:
+            print(f"✓ Camera capturing frames: {test_frame.shape}")
+            
     except Exception as e:
         print(f"✗ Failed to initialize camera: {e}")
+        import traceback
+        traceback.print_exc()
         return 1
     
     app = web.Application()

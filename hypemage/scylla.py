@@ -412,6 +412,35 @@ class Scylla:
     def _update(self):
         """Main update loop - runs every iteration"""
         try:
+            # Clear terminal at start of each frame - multiple methods for compatibility
+            import os
+            import subprocess
+            import sys
+            
+            # Method 1: ANSI escape sequence (works on most terminals)
+            print('\033[2J\033[H', end='', flush=True)
+            
+            # Method 2: Windows cls command
+            if os.name == 'nt':  # Windows
+                os.system('cls')
+            else:  # Unix/Linux/Mac
+                os.system('clear')
+            
+            # Method 3: Alternative ANSI sequences
+            print('\033c', end='', flush=True)
+            
+            # Method 4: Subprocess clear (works through SSH)
+            try:
+                subprocess.run(['clear'], check=False, capture_output=True)
+            except:
+                pass
+            
+            # Method 5: Windows alternative
+            try:
+                subprocess.run(['cls'], shell=True, check=False, capture_output=True)
+            except:
+                pass
+            
             current_time = time.time()
             state_cfg = self.STATE_CONFIGS[self.current_state]
             

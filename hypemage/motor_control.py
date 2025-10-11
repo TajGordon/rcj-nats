@@ -92,7 +92,7 @@ class MotorController:
         
         # Motor direction multipliers (for inverting motor directions)
         # Default: all motors forward, but can be overridden in config
-        self.motor_multipliers = self.config.get('motor_multipliers', [1.0, 1.0, -1.0, -1.0])
+        self.motor_multipliers = self.config.get('motor_multipliers', [-1.0, -1.0, 1.0, 1.0])
         
         # Current state
         self.current_speeds = [0.0, 0.0, 0.0, 0.0]

@@ -154,8 +154,8 @@ class CameraProcess:
         # Extract HSV ranges from config
         hsv_ranges = self.config.get('hsv_ranges', {})
         ball_cfg = hsv_ranges.get('ball', {})
-        self.lower_orange = np.array(ball_cfg.get("lower", [0, 132, 61]))
-        self.upper_orange = np.array(ball_cfg.get("upper", [14, 255, 255]))
+        self.lower_orange = np.array(ball_cfg.get("lower", [0, 180, 170]))
+        self.upper_orange = np.array(ball_cfg.get("upper", [50, 255, 255]))
         self.min_ball_area = ball_cfg.get("min_area", 100)
         self.max_ball_area = ball_cfg.get("max_area", 50000)
         

@@ -849,12 +849,8 @@ class Scylla:
     
     def state_chase_ball(self):
         """
-        Chase ball: Move directly towards the ball's position
-        
-        Approach:
-        1. Calculate angle to ball based on its position in the camera frame
-        2. Move in that direction at appropriate speed
-        3. Add rotation component to align with ball
+        Chase ball: Move directly towards the ball's position at fixed slow speed
+        Simple wrapper to move_robot_relative with ball angle
         """
         # Check for pause
         if self._is_paused:
@@ -866,43 +862,19 @@ class Scylla:
         ball = self.latest_camera_data.ball
         
         if ball.detected:
-            # Check if ball is close and centered - transition to lineup
-            if ball.is_close_and_centered:
-                logger.info("Ball is close and centered - transitioning to lineup kick")
-                # self.transition_to(State.LINEUP_KICK)
-                return
-            
             if self.motor_controller:
-                # Use angle and distance calculated by camera process
+                # Simple movement: just move towards the ball at fixed slow speed
                 # ball.angle: angle from forward direction in degrees (-180 to 180)
                 # 0° = forward (up in mirror), 90° = right, -90° = left, ±180° = backward
-                # ball.distance: distance from mirror center in pixels
-                
-                # Determine speed based on how far off-center the ball is
-                # If ball is centered, move faster; if off to side, move slower to allow turning
-                alignment_factor = 1.0 - abs(ball.horizontal_error)  # 1.0 when centered, 0.0 when at edge
-                base_speed = 0.05
-                speed = base_speed * (0.3 + 0.7 * alignment_factor)  # 30%-100% of base speed
-                
-                # Add rotation component to help align with ball
-                rotation_gain = 0.04
-                rotation = -ball.horizontal_error * rotation_gain  # Negative to turn towards ball
-                
-                # Clamp rotation
-                max_rotation = 0.08
-                rotation = max(-max_rotation, min(max_rotation, rotation))
-                
-                # Move towards the ball's angle
                 try:
                     self.motor_controller.move_robot_relative(
-                        angle=ball.angle,  # Use angle calculated by camera process
-                        speed=speed,
-                        rotation=rotation
+                        angle=ball.angle,
+                        speed=0.05,
+                        rotation=0.0
                     )
                     
                     logger.info(
                         f"Chasing ball: angle={ball.angle:.1f}°, distance={ball.distance:.1f}px, "
-                        f"speed={speed:.3f}, rotation={rotation:.3f}, h_err={ball.horizontal_error:.2f}, "
                         f"ball_pos=({ball.center_x}, {ball.center_y})"
                     )
                 except Exception as e:

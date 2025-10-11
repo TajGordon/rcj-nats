@@ -834,8 +834,8 @@ class Scylla:
                 # - y = -vertical_error (forward/back offset, inverted because negative vertical_error = forward)
                 # This gives us the angle from the robot's perspective
                 raw_ball_angle = math.degrees(math.atan2(
-                    ball.horizontal_error,    # x: horizontal offset (-1 to +1)
-                    -ball.vertical_error      # y: vertical offset (inverted: -1 to +1)
+                    -ball.horizontal_error,   # x: horizontal offset (inverted to fix direction)
+                    ball.vertical_error       # y: vertical offset (not inverted)
                 ))
                 
                 # Normalize angle to 0-360° range for consistency

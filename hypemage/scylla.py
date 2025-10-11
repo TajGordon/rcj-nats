@@ -22,9 +22,37 @@ import signal
 
 from hypemage.logger import get_logger
 from hypemage.motor_control import MotorController, MotorInitializationError
-from hypemage.camera import CameraProcess, CameraInitializationError
-from hypemage.dribbler_control import DribblerController
-from hypemage.kicker_control import KickerController
+
+# Try to import camera module, but don't fail if cv2 is not available
+try:
+    from hypemage.camera import CameraProcess, CameraInitializationError
+    CAMERA_AVAILABLE = True
+except ImportError as e:
+    logger = get_logger(__name__)
+    logger.warning(f"Camera module not available: {e}")
+    logger.warning("Robot will run without camera support")
+    CAMERA_AVAILABLE = False
+    CameraProcess = None
+    CameraInitializationError = Exception
+
+# Try to import dribbler and kicker, but continue if they fail
+try:
+    from hypemage.dribbler_control import DribblerController
+    DRIBBLER_AVAILABLE = True
+except ImportError as e:
+    logger = get_logger(__name__)
+    logger.warning(f"Dribbler module not available: {e}")
+    DRIBBLER_AVAILABLE = False
+    DribblerController = None
+
+try:
+    from hypemage.kicker_control import KickerController
+    KICKER_AVAILABLE = True
+except ImportError as e:
+    logger = get_logger(__name__)
+    logger.warning(f"Kicker module not available: {e}")
+    KICKER_AVAILABLE = False
+    KickerController = None
 
 logger = get_logger(__name__)
 
@@ -276,33 +304,41 @@ class Scylla:
         logger.info("Initializing non-critical components...")
         
         # Initialize dribbler (NON-CRITICAL)
-        try:
-            logger.info("Initializing dribbler controller...")
-            dribbler_config = self.config.get('dribbler', {})
-            # Auto-detect address based on hostname if not specified
-            dribbler_address = dribbler_config.get('address', None)
-            self.dribbler_controller = DribblerController(
-                address=dribbler_address,
-                threaded=True
-            )
-            self.status.dribbler = True
-            logger.info("✓ Dribbler controller initialized successfully")
-        except Exception as e:
-            logger.warning(f"⚠️  Dribbler initialization failed: {e}")
-            logger.warning("Robot will continue without dribbler")
+        if DRIBBLER_AVAILABLE:
+            try:
+                logger.info("Initializing dribbler controller...")
+                dribbler_config = self.config.get('dribbler', {})
+                # Auto-detect address based on hostname if not specified
+                dribbler_address = dribbler_config.get('address', None)
+                self.dribbler_controller = DribblerController(
+                    address=dribbler_address,
+                    threaded=True
+                )
+                self.status.dribbler = True
+                logger.info("✓ Dribbler controller initialized successfully")
+            except Exception as e:
+                logger.warning(f"⚠️  Dribbler initialization failed: {e}")
+                logger.warning("Robot will continue without dribbler")
+                self.dribbler_controller = None
+        else:
+            logger.warning("Dribbler module not available - skipping initialization")
             self.dribbler_controller = None
         
         # Initialize kicker (NON-CRITICAL)
-        try:
-            logger.info("Initializing kicker controller...")
-            kicker_config = self.config.get('kicker', {})
-            kick_duration = kicker_config.get('kick_duration', 0.15)
-            self.kicker_controller = KickerController(kick_duration=kick_duration)
-            self.status.kicker = True
-            logger.info("✓ Kicker controller initialized successfully")
-        except Exception as e:
-            logger.warning(f"⚠️  Kicker initialization failed: {e}")
-            logger.warning("Robot will continue without kicker")
+        if KICKER_AVAILABLE:
+            try:
+                logger.info("Initializing kicker controller...")
+                kicker_config = self.config.get('kicker', {})
+                kick_duration = kicker_config.get('kick_duration', 0.15)
+                self.kicker_controller = KickerController(kick_duration=kick_duration)
+                self.status.kicker = True
+                logger.info("✓ Kicker controller initialized successfully")
+            except Exception as e:
+                logger.warning(f"⚠️  Kicker initialization failed: {e}")
+                logger.warning("Robot will continue without kicker")
+                self.kicker_controller = None
+        else:
+            logger.warning("Kicker module not available - skipping initialization")
             self.kicker_controller = None
         
         # Log updated component status
@@ -419,6 +455,10 @@ class Scylla:
     
     def _start_camera_process(self):
         """Start the camera process"""
+        if not CAMERA_AVAILABLE:
+            logger.warning("Camera module not available - cannot start camera process")
+            return
+        
         from hypemage.camera import start as camera_start
         
         proc = self.ctx.Process(

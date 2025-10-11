@@ -565,8 +565,82 @@ async def index_handler(request):
                 canvas.width = img.width;
                 canvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
+                
+                // Draw angle guide lines on the square canvas
+                if (canvasId === 'squareCanvas') {
+                    drawAngleGuides(ctx, canvas.width, canvas.height);
+                }
             };
             img.src = 'data:image/jpeg;base64,' + base64Data;
+        }
+        
+        function drawAngleGuides(ctx, width, height) {
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) * 0.45; // 90% diameter
+            
+            // Save context state
+            ctx.save();
+            
+            // Draw angle lines every 45 degrees
+            const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+            const angleLabels = ['0°\n(Forward)', '45°', '90°\n(Left)', '135°', '180°\n(Back)', '225°', '270°\n(Right)', '315°'];
+            
+            angles.forEach((angle, index) => {
+                // Convert to radians (0° = up/forward in our coordinate system)
+                const radians = (angle - 90) * Math.PI / 180;
+                
+                // Calculate line endpoints
+                const startX = centerX + Math.cos(radians) * 20;
+                const startY = centerY + Math.sin(radians) * 20;
+                const endX = centerX + Math.cos(radians) * radius;
+                const endY = centerY + Math.sin(radians) * radius;
+                
+                // Draw line
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]); // Dashed line
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+                
+                // Draw angle label at the end of the line
+                const labelX = centerX + Math.cos(radians) * (radius + 30);
+                const labelY = centerY + Math.sin(radians) * (radius + 30);
+                
+                ctx.fillStyle = '#00ff88';
+                ctx.font = 'bold 16px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                ctx.shadowBlur = 4;
+                
+                // Draw multi-line labels
+                const lines = angleLabels[index].split('\\n');
+                lines.forEach((line, lineIndex) => {
+                    ctx.fillText(line, labelX, labelY + (lineIndex - 0.5) * 18);
+                });
+            });
+            
+            // Draw center circle
+            ctx.setLineDash([]); // Solid line
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);
+            ctx.stroke();
+            
+            // Draw center crosshair
+            ctx.beginPath();
+            ctx.moveTo(centerX - 15, centerY);
+            ctx.lineTo(centerX + 15, centerY);
+            ctx.moveTo(centerX, centerY - 15);
+            ctx.lineTo(centerX, centerY + 15);
+            ctx.stroke();
+            
+            // Restore context state
+            ctx.restore();
         }
         
         function redetectMirror() {

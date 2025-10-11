@@ -859,10 +859,10 @@ class Scylla:
                 
                 # Use horizontal error for steering
                 # horizontal_error: -1 (left) to +1 (right)
-                # Positive = ball to the right, so turn right (positive rotation)
-                # Negative = ball to the left, so turn left (negative rotation)
+                # When ball is to the right (+), we need negative rotation to turn right
+                # When ball is to the left (-), we need positive rotation to turn left
                 steering_gain = 0.03  # How much to turn based on ball position
-                rotation = ball.horizontal_error * steering_gain
+                rotation = -ball.horizontal_error * steering_gain  # Inverted to fix direction
                 
                 # Clamp rotation to reasonable limits
                 max_rotation = 0.05

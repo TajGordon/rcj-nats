@@ -866,43 +866,39 @@ class Scylla:
         ball = self.latest_camera_data.ball
         
         if ball.detected:
-            # Check if ball is close and centered - transition to lineup
-            if ball.is_close_and_centered:
-                logger.info("Ball is close and centered - transitioning to lineup kick")
-                # self.transition_to(State.LINEUP_KICK)
-                return
+            # Just continue chasing - no state transitions
+            pass
             
             if self.motor_controller:
-                # Use angle and distance calculated by camera process
+                # Standard differential steering: move forward toward ball while rotating to align
                 # ball.angle: angle from forward direction in degrees (-180 to 180)
                 # 0° = forward (up in mirror), 90° = right, -90° = left, ±180° = backward
                 # ball.distance: distance from mirror center in pixels
                 
-                # Determine speed based on how far off-center the ball is
-                # If ball is centered, move faster; if off to side, move slower to allow turning
-                alignment_factor = 1.0 - abs(ball.horizontal_error)  # 1.0 when centered, 0.0 when at edge
-                base_speed = 0.05
-                speed = base_speed * (0.3 + 0.7 * alignment_factor)  # 30%-100% of base speed
+                # Base forward speed - move toward ball at constant speed
+                base_speed = 0.05  # Slow speed like before
                 
-                # Add rotation component to help align with ball
-                rotation_gain = 0.04
-                rotation = -ball.horizontal_error * rotation_gain  # Negative to turn towards ball
+                # Calculate rotation to align with ball
+                # ball.horizontal_error: -1.0 (far left) to +1.0 (far right)
+                # We want to turn toward the ball, so negative error = turn left (positive rotation)
+                rotation_gain = 0.06  # Increased for more responsive turning
+                rotation = -ball.horizontal_error * rotation_gain
                 
-                # Clamp rotation
-                max_rotation = 0.08
+                # Clamp rotation to prevent excessive spinning
+                max_rotation = 0.12
                 rotation = max(-max_rotation, min(max_rotation, rotation))
                 
-                # Move towards the ball's angle
+                # Use differential steering: always move forward (0°) with rotation
                 try:
                     self.motor_controller.move_robot_relative(
-                        angle=ball.angle,  # Use angle calculated by camera process
-                        speed=speed,
+                        angle=0,  # Always move forward
+                        speed=base_speed,
                         rotation=rotation
                     )
                     
                     logger.info(
                         f"Chasing ball: angle={ball.angle:.1f}°, distance={ball.distance:.1f}px, "
-                        f"speed={speed:.3f}, rotation={rotation:.3f}, h_err={ball.horizontal_error:.2f}, "
+                        f"speed={base_speed:.3f}, rotation={rotation:.3f}, h_err={ball.horizontal_error:.2f}, "
                         f"ball_pos=({ball.center_x}, {ball.center_y})"
                     )
                 except Exception as e:
@@ -911,9 +907,10 @@ class Scylla:
             else:
                 logger.warning("No motor controller available for ball chasing")
         else:
-            # Lost ball - transition to search
-            logger.info("Ball lost during chase - transitioning to search")
-            self.transition_to(State.SEARCH_BALL)
+            # Lost ball - just stop and wait for ball to reappear
+            logger.info("Ball lost during chase - stopping and waiting")
+            if self.motor_controller:
+                self.motor_controller.stop()
     
     def state_defend_goal(self):
         """Defensive positioning"""

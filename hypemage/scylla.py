@@ -874,8 +874,8 @@ class Scylla:
                 # - y = -vertical_error (forward/back offset, inverted because negative vertical_error = forward)
                 # This gives us the angle from the robot's perspective
                 raw_ball_angle = math.degrees(math.atan2(
-                    -ball.horizontal_error,   # x: horizontal offset (inverted to fix direction)
-                    ball.vertical_error       # y: vertical offset (not inverted)
+                    ball.horizontal_error,    # x: horizontal offset (-1 to +1)
+                    -ball.vertical_error      # y: vertical offset (inverted: -1 to +1)
                 ))
                 
                 # Normalize angle to 0-360° range for consistency
@@ -894,10 +894,10 @@ class Scylla:
                 # Convert to unit vectors, average, then convert back
                 avg_x = sum(math.cos(math.radians(a)) for a in self._chase_angle_history)
                 avg_y = sum(math.sin(math.radians(a)) for a in self._chase_angle_history)
-                ball_angle_raw = math.degrees(math.atan2(avg_y, avg_x))
+                ball_angle = math.degrees(math.atan2(avg_y, avg_x))
                 
-                # FIX: Add 180° to flip direction (robot was going opposite direction)
-                ball_angle = (ball_angle_raw + 180) % 360
+                # Ensure angle is in 0-360° range
+                ball_angle = ball_angle % 360
                 
                 # Use constant speed for ball chasing
                 speed = 0.05
@@ -908,11 +908,11 @@ class Scylla:
                 
                 # Use a proportional controller for alignment
                 # Positive horizontal_error = ball to the right, so we need to rotate right (positive rotation)
-                rotation_gain = 0.05  # Reduced gain for slower rotation
+                rotation_gain = 0.03  # Moderate gain for smooth alignment
                 rotation = horizontal_error * rotation_gain
                 
                 # Clamp rotation to reasonable limits
-                max_rotation = 0.1  # Reduced max rotation speed
+                max_rotation = 0.4
                 rotation = max(-max_rotation, min(max_rotation, rotation))
                 
                 # If the ball is very off-center, reduce forward speed and prioritize rotation
@@ -999,7 +999,7 @@ class Scylla:
                 print("Starting ball search pattern")
             
             # Rotate slowly to search for ball
-            search_speed = 0.05  # Slow rotation speed (reduced from 0.2)
+            search_speed = 0.2  # Slow rotation speed
             self.motor_controller.move_robot_relative(
                 angle=0,  # No forward/back movement
                 speed=0,  # No translation

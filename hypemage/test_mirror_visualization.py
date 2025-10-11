@@ -144,9 +144,11 @@ def create_full_frame_visualization(frame, camera_obj, ball_result=None):
 
 async def websocket_handler(request):
     """Handle websocket connections"""
+    print(f"WebSocket connection attempt from {request.remote}")
     ws = web.WebSocketResponse()
     await ws.prepare(request)
     active_connections.add(ws)
+    print(f"WebSocket connected! Total connections: {len(active_connections)}")
     
     try:
         async for msg in ws:
@@ -163,6 +165,7 @@ async def websocket_handler(request):
                     await ws.send_json({'status': 'rotated', 'rotation': rotation})
     finally:
         active_connections.discard(ws)
+        print(f"WebSocket disconnected. Remaining connections: {len(active_connections)}")
     
     return ws
 
@@ -406,22 +409,35 @@ async def index_handler(request):
         function connect() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws`;
-            ws = new WebSocket(wsUrl);
+            console.log('Connecting to WebSocket:', wsUrl);
             
-            ws.onopen = () => {
-                document.getElementById('wsStatus').textContent = 'Connected ✓';
-                document.getElementById('wsStatus').style.color = '#00ff88';
-            };
-            
-            ws.onclose = () => {
-                document.getElementById('wsStatus').textContent = 'Disconnected ✗';
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    console.log('WebSocket connected!');
+                    document.getElementById('wsStatus').textContent = 'Connected ✓';
+                    document.getElementById('wsStatus').style.color = '#00ff88';
+                };
+                
+                ws.onclose = (event) => {
+                    console.log('WebSocket closed:', event.code, event.reason);
+                    document.getElementById('wsStatus').textContent = 'Disconnected ✗';
+                    document.getElementById('wsStatus').style.color = '#ff4444';
+                    setTimeout(connect, 2000);
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    document.getElementById('wsStatus').textContent = 'Error ✗';
+                    document.getElementById('wsStatus').style.color = '#ff4444';
+                };
+            } catch (e) {
+                console.error('Failed to create WebSocket:', e);
+                document.getElementById('wsStatus').textContent = 'Failed to connect ✗';
                 document.getElementById('wsStatus').style.color = '#ff4444';
                 setTimeout(connect, 2000);
-            };
-            
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
+            }
             
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);

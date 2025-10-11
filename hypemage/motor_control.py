@@ -410,10 +410,6 @@ class MotorController:
         Uses trigonometry to calculate motor speeds for omnidirectional movement.
         Motor arrangement (looking from above, motor order in array):
             [0] Back-left      [1] Front-left
-                    \\  /
-                     \\/
-                     /\\
-                    /  \\
             [2] Front-right    [3] Back-right
         
         Args:
@@ -445,8 +441,8 @@ class MotorController:
         
         # Apply 1.3x multiplier to right motors (front_right and back_right)
         right_motor_multiplier = 1.3
-        front_right *= right_motor_multiplier
-        back_right *= right_motor_multiplier
+        # front_right *= right_motor_multiplier
+        # back_right *= right_motor_multiplier
         
         # Normalize to keep all speeds within [-1.0, 1.0]
         max_speed = max(abs(back_left), abs(front_left), abs(front_right), abs(back_right))

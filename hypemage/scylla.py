@@ -854,8 +854,8 @@ class Scylla:
     def state_chase_ball(self):
         """
         Chase ball: Move directly towards the ball's position at fixed speed
-        Simple wrapper to move_robot_relative with ball angle
-        Only transitions to search after losing ball for 10+ frames
+        Sits and waits if ball is not visible for extended period
+        No state transitions - just chase or wait
         """
         # Check for pause
         if self._is_paused:
@@ -881,36 +881,23 @@ class Scylla:
                 self.disable_dribbler()
             
             if self.motor_controller:
-                # Standard differential steering: move forward toward ball while rotating to align
-                # ball.angle: angle from forward direction in degrees (-180 to 180)
-                # 0° = forward (up in mirror), 90° = right, -90° = left, ±180° = backward
+                # Use ball angle directly to move towards it
+                # ball.angle: 0° = forward, positive = counterclockwise (left), negative = clockwise (right)
                 # ball.distance: distance from mirror center in pixels
                 
-                # Base forward speed - doubled from 0.05 to 0.10
                 base_speed = 0.07
                 
-                # Calculate rotation to align with ball
-                # ball.horizontal_error: -1.0 (far left) to +1.0 (far right)
-                # We want to turn toward the ball, so negative error = turn left (positive rotation)
-                rotation_gain = 0.03  # Increased for more responsive turning
-                rotation = -ball.horizontal_error * rotation_gain
-                
-                # Clamp rotation to prevent excessive spinning
-                max_rotation = 0.04
-                rotation = max(-max_rotation, min(max_rotation, rotation))
-                
-                # Use differential steering: always move forward (0°) with rotation
+                # Move in the direction of the ball
                 try:
                     self.motor_controller.move_robot_relative(
-                        angle=0,  # Always move forward
+                        angle=ball.angle,  # Move directly towards ball angle
                         speed=base_speed,
-                        rotation=rotation
+                        rotation=0.0  # No rotation, just move towards ball
                     )
                     
                     logger.info(
                         f"Chasing ball: angle={ball.angle:.1f}°, distance={ball.distance:.1f}px, "
-                        f"speed={base_speed:.3f}, rotation={rotation:.3f}, h_err={ball.horizontal_error:.2f}, "
-                        f"ball_pos=({ball.center_x}, {ball.center_y})"
+                        f"speed={base_speed:.3f}, ball_pos=({ball.center_x}, {ball.center_y})"
                     )
                 except Exception as e:
                     logger.error(f"Error in motor control during ball chase: {e}")
@@ -925,19 +912,19 @@ class Scylla:
             if self._last_ball_was_close:
                 self.enable_dribbler(speed=1.8)
             
-            # Only transition to search after 10+ frames without ball
+            # After extended period without ball, just stop and wait
             if self._frames_without_ball >= 10:
-                logger.info(f"Ball lost for {self._frames_without_ball} frames - transitioning to search")
-                self._frames_without_ball = 0  # Reset counter
-                self._last_ball_was_close = False  # Reset close state
-                self.transition_to(State.SEARCH_BALL)
+                logger.info(f"Ball lost for {self._frames_without_ball} frames - stopping and waiting")
+                if self.motor_controller:
+                    self.motor_controller.stop()
+                # Don't reset counter - keep counting to show how long we've been waiting
             else:
-                # Keep moving forward while briefly losing ball
-                logger.debug(f"Ball not detected (frame {self._frames_without_ball}/10), continuing forward")
+                # Keep moving towards last known angle briefly
+                logger.debug(f"Ball not detected (frame {self._frames_without_ball}/10), continuing")
                 if self.motor_controller:
                     self.motor_controller.move_robot_relative(
-                        angle=0,
-                        speed=0.07,
+                        angle=0,  # Move forward
+                        speed=0.03,  # Slower speed while searching
                         rotation=0.0
                     )
     

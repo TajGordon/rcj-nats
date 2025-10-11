@@ -417,13 +417,15 @@ class MotorController:
             [2] Front-right    [3] Back-right
         
         Args:
-            angle: Direction in degrees (0=forward, 90=right, 180=back, 270=left)
+            angle: Direction in degrees (0=forward, positive=counterclockwise/left, negative=clockwise/right)
+                   Examples: 0=forward, +90=left, -90=right, ±180=backward
             speed: Speed magnitude [0.0 to 1.0]
             rotation: Rotation component [-1.0 to 1.0] (positive = clockwise)
         
         Example:
             controller.move_robot_relative(0, 0.5)       # Move forward at half speed
-            controller.move_robot_relative(90, 0.3)      # Move right at 30% speed
+            controller.move_robot_relative(90, 0.3)      # Move left at 30% speed
+            controller.move_robot_relative(-90, 0.3)     # Move right at 30% speed
             controller.move_robot_relative(45, 0.5, 0.2) # Move diagonal with slight rotation
         """
         # Convert angle to radians

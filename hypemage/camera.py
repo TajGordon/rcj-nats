@@ -727,10 +727,9 @@ class CameraProcess:
         distance = math.sqrt(dx * dx + dy * dy)
         
         # Calculate angle from forward direction (degrees)
-        # Note: In image coordinates, y increases downward
+        # Standard mathematical convention: positive angles = counterclockwise
         # Camera's "up" direction (-Y) is 180° opposite to robot's forward direction
-        # So we calculate angle from upward, then add 180° to align with robot's forward
-        # Result: 0° = robot forward, 90° = right, -90° = left, ±180° = backward
+        # Result: 0° = robot forward, +90° = left (counterclockwise), -90° = right (clockwise), ±180° = backward
         angle_rad = math.atan2(dx, -dy)  # atan2(x, -y) gives angle from upward direction
         angle = math.degrees(angle_rad)  # Convert to degrees (-180 to 180)
         
@@ -838,6 +837,7 @@ class CameraProcess:
         distance = math.sqrt(dx * dx + dy * dy)
         
         # Calculate angle with 180° offset for robot's forward direction
+        # Standard convention: positive = counterclockwise (left), negative = clockwise (right)
         angle_rad = math.atan2(dx, -dy)
         angle = math.degrees(angle_rad)
         
@@ -942,9 +942,9 @@ class CameraProcess:
         distance = math.sqrt(dx * dx + dy * dy)
         
         # Calculate angle from forward direction (degrees)
+        # Standard convention: positive = counterclockwise (left), negative = clockwise (right)
         # Camera's "up" direction (-Y) is 180° opposite to robot's forward direction
-        # So we calculate angle from upward, then add 180° to align with robot's forward
-        # Result: 0° = robot forward, 90° = right, -90° = left, ±180° = backward
+        # Result: 0° = robot forward, +90° = left, -90° = right, ±180° = backward
         angle_rad = math.atan2(dx, -dy)  # atan2(x, -y) gives angle from upward direction
         angle = math.degrees(angle_rad)  # Convert to degrees (-180 to 180)
         

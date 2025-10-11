@@ -91,7 +91,6 @@ class State(Enum):
     CHASE_BALL = auto()
     DEFEND_GOAL = auto()
     ATTACK_GOAL = auto()
-    SEARCH_BALL = auto()
     LINEUP_KICK = auto()
     STOPPED = auto()
     MOVE_IN_SQUARE = auto()  # Example state for testing movement
@@ -141,12 +140,6 @@ class Scylla:
             needs_localization=True,
             needs_motors=True,
             update_rate_hz=30.0
-        ),
-        State.SEARCH_BALL: StateConfig(
-            needs_camera=True,
-            needs_localization=True,
-            needs_motors=True,
-            update_rate_hz=15.0
         ),
         State.LINEUP_KICK: StateConfig(
             needs_camera=True,
@@ -853,9 +846,8 @@ class Scylla:
     
     def state_chase_ball(self):
         """
-        Chase ball: Move directly towards the ball's position at fixed speed
-        Sits and waits if ball is not visible for extended period
-        No state transitions - just chase or wait
+        Chase ball: Move towards ball if found, do nothing if not found
+        Simple behavior - no complex search patterns
         """
         # Check for pause
         if self._is_paused:
@@ -867,9 +859,6 @@ class Scylla:
         ball = self.latest_camera_data.ball
         
         if ball.detected:
-            # Reset counter when ball is detected
-            self._frames_without_ball = 0
-            
             # Track if ball is close and enable dribbler accordingly
             if ball.is_close:
                 self._last_ball_was_close = True
@@ -883,11 +872,8 @@ class Scylla:
             if self.motor_controller:
                 # Use ball angle directly to move towards it
                 # ball.angle: 0° = forward, positive = counterclockwise (left), negative = clockwise (right)
-                # ball.distance: distance from mirror center in pixels
                 
                 base_speed = 0.07
-                
-                # Store the exact angle being used for movement
                 movement_angle = ball.angle
                 
                 # Move in the direction of the ball
@@ -899,10 +885,9 @@ class Scylla:
                     )
                     
                     logger.info(
-                        f"Chasing ball: USING_ANGLE={movement_angle:.1f}° (ball.angle={ball.angle:.1f}°) "
+                        f"Chasing ball: angle={movement_angle:.1f}° "
                         f"distance={ball.distance:.1f}px speed={base_speed:.3f} "
-                        f"ball_pos=({ball.center_x}, {ball.center_y}) "
-                        f"h_err={ball.horizontal_error:.3f} frame_id={self.latest_camera_data.frame_id}"
+                        f"ball_pos=({ball.center_x}, {ball.center_y})"
                     )
                 except Exception as e:
                     logger.error(f"Error in motor control during ball chase: {e}")
@@ -910,28 +895,14 @@ class Scylla:
             else:
                 logger.warning("No motor controller available for ball chasing")
         else:
-            # Ball not detected - increment counter
-            self._frames_without_ball += 1
-            
+            # Ball not detected - do nothing, just wait
             # Keep dribbler on if last seen ball was close (might have it in dribbler)
             if self._last_ball_was_close:
                 self.enable_dribbler(speed=1.8)
             
-            # After extended period without ball, just stop and wait
-            if self._frames_without_ball >= 10:
-                logger.info(f"Ball lost for {self._frames_without_ball} frames - stopping and waiting")
-                if self.motor_controller:
-                    self.motor_controller.stop()
-                # Don't reset counter - keep counting to show how long we've been waiting
-            else:
-                # Keep moving towards last known angle briefly
-                logger.debug(f"Ball not detected (frame {self._frames_without_ball}/10), continuing")
-                if self.motor_controller:
-                    self.motor_controller.move_robot_relative(
-                        angle=0,  # Move forward
-                        speed=0.03,  # Slower speed while searching
-                        rotation=0.0
-                    )
+            # Stop motors when ball is not found
+            if self.motor_controller:
+                self.motor_controller.stop()
     
     def state_defend_goal(self):
         """Defensive positioning"""
@@ -961,45 +932,6 @@ class Scylla:
             print(f"Attack: ball={ball.detected}, goal={yellow_goal.detected}")
             # Logic to push ball toward goal
     
-    def state_search_ball(self):
-        """Ball lost - search pattern"""
-        # Check for pause
-        if self._is_paused:
-            return
-        
-        print("Searching for ball...")
-        
-        # Check if ball is found
-        if self.latest_camera_data and self.latest_camera_data.ball.detected:
-            print("Ball found during search - transitioning to chase")
-            self.transition_to(State.CHASE_BALL)
-            return
-        
-        # Perform search pattern if motor controller is available
-        if self.motor_controller:
-            # Initialize search state if not already done
-            if not hasattr(self, '_search_state_init'):
-                self._search_state_init = True
-                self._search_start_time = time.time()
-                self._search_direction = 1  # 1 for clockwise, -1 for counter-clockwise
-                print("Starting ball search pattern")
-            
-            # Rotate slowly to search for ball
-            search_speed = 0.2  # Slow rotation speed
-            self.motor_controller.move_robot_relative(
-                angle=0,  # No forward/back movement
-                speed=0,  # No translation
-                rotation=self._search_direction * search_speed  # Rotate to search
-            )
-            
-            # Change search direction every 3 seconds
-            search_duration = 3.0
-            if time.time() - self._search_start_time > search_duration:
-                self._search_direction *= -1  # Reverse direction
-                self._search_start_time = time.time()
-                print(f"Changing search direction to {'clockwise' if self._search_direction > 0 else 'counter-clockwise'}")
-        else:
-            logger.warning("No motor controller available for ball search")
     
     def state_lineup_kick(self):
         """Line up for a kick"""
@@ -1121,10 +1053,9 @@ class Scylla:
     
     def on_enter_chase_ball(self):
         """Called when entering chase_ball state"""
-        logger.info("Entering CHASE_BALL mode")
+        logger.info("Entering CHASE_BALL mode - simple chase behavior")
         
-        # Reset ball tracking counter and state
-        self._frames_without_ball = 0
+        # Reset ball tracking state
         self._last_ball_was_close = False
         
         # Could send camera command to prioritize ball detection
@@ -1137,16 +1068,6 @@ class Scylla:
         # Disable dribbler when exiting chase
         self.disable_dribbler()
     
-    def on_exit_search_ball(self):
-        """Called when exiting search_ball state"""
-        print("Exiting SEARCH_BALL mode")
-        # Clean up search state variables
-        if hasattr(self, '_search_state_init'):
-            delattr(self, '_search_state_init')
-        if hasattr(self, '_search_start_time'):
-            delattr(self, '_search_start_time')
-        if hasattr(self, '_search_direction'):
-            delattr(self, '_search_direction')
     
     def on_exit_move_in_square(self):
         """Called when exiting move_in_square state"""

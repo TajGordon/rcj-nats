@@ -521,8 +521,8 @@ async def frame_broadcaster():
             viz = create_visualization_overlay(viz, current_angle, current_speed, is_moving, camera)
             
             # Rotate and flip image for proper orientation (like mirror visualization)
-            viz = cv2.rotate(viz, cv2.ROTATE_180)
-            viz = cv2.flip(viz, 1)  # Horizontal flip
+            # viz = cv2.rotate(viz, cv2.ROTATE_180)
+            # viz = cv2.flip(viz, 1)  # Horizontal flip
             
             # Encode as JPEG
             _, jpg = cv2.imencode('.jpg', viz, [cv2.IMWRITE_JPEG_QUALITY, 90])

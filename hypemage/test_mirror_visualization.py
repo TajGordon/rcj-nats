@@ -205,10 +205,43 @@ async def index_handler(request):
             color: #00ff88;
             font-size: 18px;
         }
+        .canvas-container {
+            position: relative;
+            display: inline-block;
+        }
         canvas {
             display: block;
             border-radius: 5px;
             background: #000;
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+        }
+        .overlay-text {
+            position: absolute;
+            color: #00ff88;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        .overlay-text.ball {
+            color: #ffa500;
+        }
+        .overlay-text.ball.in-close-zone {
+            color: #ff00ff;
+        }
+        .overlay-text.mirror {
+            color: #00ff88;
+        }
+        .overlay-text.heading {
+            color: #ffff00;
         }
         .controls {
             background: #1a1a1a;
@@ -286,11 +319,17 @@ async def index_handler(request):
         <div class="view-container">
             <div class="view-box">
                 <h2>📹 Original View (No Overlay)</h2>
-                <canvas id="originalCanvas"></canvas>
+                <div class="canvas-container">
+                    <canvas id="originalCanvas"></canvas>
+                    <div class="overlay" id="originalOverlay"></div>
+                </div>
             </div>
             <div class="view-box">
                 <h2>🔍 Full Frame with Mirror Mask & Overlays</h2>
-                <canvas id="squareCanvas"></canvas>
+                <div class="canvas-container">
+                    <canvas id="squareCanvas"></canvas>
+                    <div class="overlay" id="squareOverlay"></div>
+                </div>
             </div>
         </div>
         
@@ -458,7 +497,59 @@ async def index_handler(request):
                     frameCount = 0;
                     lastFpsUpdate = now;
                 }
+                
+                // Update overlay text on images
+                updateOverlays(data);
             };
+        }
+        
+        function updateOverlays(data) {
+            // Clear overlays
+            document.getElementById('squareOverlay').innerHTML = '';
+            
+            // Get canvas dimensions (images are rotated/flipped, so positions need adjustment)
+            const canvas = document.getElementById('squareCanvas');
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+            
+            if (!canvasWidth || !canvasHeight) return;
+            
+            const overlay = document.getElementById('squareOverlay');
+            
+            // Mirror info overlay (top left)
+            if (data.mirror_detected && data.mirror) {
+                const m = data.mirror;
+                const mirrorText = document.createElement('div');
+                mirrorText.className = 'overlay-text mirror';
+                mirrorText.style.top = '10px';
+                mirrorText.style.left = '10px';
+                mirrorText.innerHTML = `Mirror: (${m.center_x}, ${m.center_y}) R=${m.radius}px<br>Heading: ${m.heading}°`;
+                overlay.appendChild(mirrorText);
+            }
+            
+            // Ball info overlay (near ball position if detected)
+            if (data.ball_detected && data.ball) {
+                const b = data.ball;
+                
+                // Note: Images are rotated 180° and flipped horizontally
+                // So we need to transform coordinates: (x,y) -> (width-x, height-y)
+                const displayX = canvasWidth - b.center_x;
+                const displayY = canvasHeight - b.center_y;
+                
+                const ballText = document.createElement('div');
+                ballText.className = b.in_close_zone ? 'overlay-text ball in-close-zone' : 'overlay-text ball';
+                
+                // Position text offset from ball
+                ballText.style.left = (displayX + b.radius + 10) + 'px';
+                ballText.style.top = (displayY - b.radius - 10) + 'px';
+                
+                const zoneLabel = b.in_close_zone ? '🎯 CLOSE ZONE<br>' : '';
+                ballText.innerHTML = 
+                    zoneLabel +
+                    `Ball: ${b.angle.toFixed(1)}°<br>` +
+                    `Dist: ${b.distance.toFixed(0)}px`;
+                overlay.appendChild(ballText);
+            }
         }
         
         function drawImage(canvasId, base64Data) {

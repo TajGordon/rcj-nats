@@ -62,7 +62,7 @@
     },
     "motor_addresses": "_AUTO_DETECT_",
     "_comment_motor_addresses": "Motor addresses are auto-detected based on hostname. m7 (necron) uses [27,29,25,26]. f7 (storm) uses [28,30,26,27] via mapping: 25→26, 26→27, 27→28, 29→30. Set explicitly here or in robot-specific section to override auto-detection.",
-    "motor_multipliers": [1.0, 1.0, -1.0, -1.0],
+    "motor_multipliers": [-1.0, -1.0, 1.0, 1.0],
     "_comment_motor_multipliers": "Default motor direction multipliers (1.0 = normal, -1.0 = reversed). Order: [back_left, front_left, front_right, back_right]",
     "max_speed": 400000000,
     "_comment_max_speed": "Maximum motor speed in encoder units",

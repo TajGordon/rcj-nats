@@ -229,6 +229,7 @@ async def index_handler(request):
             display: block;
             border-radius: 5px;
             background: #000;
+            transform: rotate(180deg);
         }
         .controls {
             background: #1a1a1a;

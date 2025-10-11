@@ -406,35 +406,43 @@ async def index_handler(request):
         let frameCount = 0;
         let lastFpsUpdate = Date.now();
         
+        // Log to screen for debugging
+        function debugLog(msg) {
+            console.log(msg);
+            const debugDiv = document.getElementById('wsStatus');
+            if (debugDiv) {
+                debugDiv.textContent = msg;
+            }
+        }
+        
         function connect() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws`;
-            console.log('Connecting to WebSocket:', wsUrl);
+            debugLog('Attempting connection to: ' + wsUrl);
             
             try {
                 ws = new WebSocket(wsUrl);
+                debugLog('WebSocket object created');
                 
                 ws.onopen = () => {
-                    console.log('WebSocket connected!');
-                    document.getElementById('wsStatus').textContent = 'Connected ✓';
+                    debugLog('Connected ✓');
                     document.getElementById('wsStatus').style.color = '#00ff88';
                 };
                 
                 ws.onclose = (event) => {
-                    console.log('WebSocket closed:', event.code, event.reason);
-                    document.getElementById('wsStatus').textContent = 'Disconnected ✗';
+                    debugLog(`Disconnected (code: ${event.code}) ✗`);
                     document.getElementById('wsStatus').style.color = '#ff4444';
                     setTimeout(connect, 2000);
                 };
                 
                 ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    document.getElementById('wsStatus').textContent = 'Error ✗';
+                    debugLog('Connection Error ✗');
                     document.getElementById('wsStatus').style.color = '#ff4444';
                 };
             } catch (e) {
                 console.error('Failed to create WebSocket:', e);
-                document.getElementById('wsStatus').textContent = 'Failed to connect ✗';
+                debugLog('Failed: ' + e.message);
                 document.getElementById('wsStatus').style.color = '#ff4444';
                 setTimeout(connect, 2000);
             }

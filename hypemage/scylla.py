@@ -226,6 +226,7 @@ class Scylla:
         
         # Chase ball tracking
         self._frames_without_ball = 0  # Counter for frames without ball detection
+        self._last_ball_was_close = False  # Track if last seen ball was close
         
         # Timing
         self.last_update_time = 0.0
@@ -869,6 +870,16 @@ class Scylla:
             # Reset counter when ball is detected
             self._frames_without_ball = 0
             
+            # Track if ball is close and enable dribbler accordingly
+            if ball.is_close:
+                self._last_ball_was_close = True
+                # Enable dribbler at speed 1.8 when ball is close
+                self.enable_dribbler(speed=1.8)
+            else:
+                self._last_ball_was_close = False
+                # Disable dribbler when ball is not close
+                self.disable_dribbler()
+            
             if self.motor_controller:
                 # Standard differential steering: move forward toward ball while rotating to align
                 # ball.angle: angle from forward direction in degrees (-180 to 180)
@@ -910,10 +921,15 @@ class Scylla:
             # Ball not detected - increment counter
             self._frames_without_ball += 1
             
+            # Keep dribbler on if last seen ball was close (might have it in dribbler)
+            if self._last_ball_was_close:
+                self.enable_dribbler(speed=1.8)
+            
             # Only transition to search after 10+ frames without ball
             if self._frames_without_ball >= 10:
                 logger.info(f"Ball lost for {self._frames_without_ball} frames - transitioning to search")
                 self._frames_without_ball = 0  # Reset counter
+                self._last_ball_was_close = False  # Reset close state
                 self.transition_to(State.SEARCH_BALL)
             else:
                 # Keep moving forward while briefly losing ball
@@ -1115,8 +1131,9 @@ class Scylla:
         """Called when entering chase_ball state"""
         logger.info("Entering CHASE_BALL mode")
         
-        # Reset ball tracking counter
+        # Reset ball tracking counter and state
         self._frames_without_ball = 0
+        self._last_ball_was_close = False
         
         # Could send camera command to prioritize ball detection
         self.queues['camera_cmd'].put({'type': 'detect_ball'})

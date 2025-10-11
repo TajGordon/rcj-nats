@@ -45,6 +45,16 @@ except ImportError as e:
     DRIBBLER_AVAILABLE = False
     DribblerController = None
 
+# Try to import Motor class directly for simple dribbler control
+try:
+    from motors.motor import Motor
+    MOTOR_AVAILABLE = True
+except ImportError as e:
+    logger = get_logger(__name__)
+    logger.warning(f"Motor module not available: {e}")
+    MOTOR_AVAILABLE = False
+    Motor = None
+
 try:
     from hypemage.kicker_control import KickerController
     KICKER_AVAILABLE = True
@@ -229,6 +239,7 @@ class Scylla:
         
         # Dribbler and kicker controllers (non-critical)
         self.dribbler_controller = None
+        self.simple_dribbler_motor = None  # Simple motor for constant dribbler speed
         self.kicker_controller = None
         
         # Initialize resources
@@ -284,6 +295,14 @@ class Scylla:
                 logger.debug("Emergency dribbler stop executed")
             except Exception as e:
                 logger.error(f"Emergency dribbler stop failed: {e}")
+        
+        # Stop simple dribbler motor
+        if hasattr(self, 'simple_dribbler_motor') and self.simple_dribbler_motor:
+            try:
+                self.simple_dribbler_motor.set_speed(0)
+                logger.debug("Emergency simple dribbler motor stop executed")
+            except Exception as e:
+                logger.error(f"Emergency simple dribbler motor stop failed: {e}")
     
     def _init_critical_components(self):
         """
@@ -340,6 +359,33 @@ class Scylla:
             logger.warning("Dribbler module not available - skipping initialization")
             self.dribbler_controller = None
         
+        # Initialize simple dribbler motor (NON-CRITICAL) - runs at constant speed 3.0
+        if MOTOR_AVAILABLE:
+            try:
+                logger.info("Initializing simple dribbler motor...")
+                # Determine dribbler motor address based on hostname
+                import socket
+                hostname = socket.gethostname()
+                if 'f7' in hostname.lower():
+                    dribbler_address = 29
+                    logger.info("Detected f7 robot - using dribbler address 29")
+                elif 'm7' in hostname.lower():
+                    dribbler_address = 30
+                    logger.info("Detected m7 robot - using dribbler address 30")
+                else:
+                    dribbler_address = 30  # Default to m7
+                    logger.info(f"Unknown hostname '{hostname}' - defaulting to dribbler address 30")
+                
+                self.simple_dribbler_motor = Motor(dribbler_address)
+                logger.info(f"✓ Simple dribbler motor initialized at address {dribbler_address}")
+            except Exception as e:
+                logger.warning(f"⚠️  Simple dribbler motor initialization failed: {e}")
+                logger.warning("Robot will continue without simple dribbler")
+                self.simple_dribbler_motor = None
+        else:
+            logger.warning("Motor module not available - skipping simple dribbler initialization")
+            self.simple_dribbler_motor = None
+        
         # Initialize kicker (NON-CRITICAL)
         if KICKER_AVAILABLE:
             try:
@@ -385,6 +431,15 @@ class Scylla:
     def start(self):
         """Start the FSM main loop"""
         self._start_always_on_processes()
+        
+        # Start simple dribbler motor at speed 3.0 (runs throughout the game)
+        if self.simple_dribbler_motor:
+            try:
+                logger.info("Starting simple dribbler motor at speed 3.0...")
+                self.simple_dribbler_motor.set_speed(3.0)
+                logger.info("✓ Dribbler motor running at speed 3.0")
+            except Exception as e:
+                logger.warning(f"⚠️  Failed to start dribbler motor: {e}")
         
         try:
             while not self.events['stop'].is_set():
@@ -1151,6 +1206,16 @@ class Scylla:
             except Exception as e:
                 logger.error(f"Failed to stop dribbler during shutdown: {e}")
                 print(f"⚠️  Warning: Dribbler stop failed: {e}")
+        
+        # Stop simple dribbler motor
+        if self.simple_dribbler_motor:
+            try:
+                logger.info("Stopping simple dribbler motor...")
+                self.simple_dribbler_motor.set_speed(0)
+                print("✓ Simple dribbler motor stopped")
+            except Exception as e:
+                logger.error(f"Failed to stop simple dribbler motor during shutdown: {e}")
+                print(f"⚠️  Warning: Simple dribbler motor stop failed: {e}")
         
         # Disable kicker
         if self.kicker_controller:

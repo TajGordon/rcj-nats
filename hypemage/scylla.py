@@ -23,12 +23,14 @@ import signal
 from hypemage.logger import get_logger
 from hypemage.motor_control import MotorController, MotorInitializationError
 
+# Initialize logger early so it's available for import error handling
+logger = get_logger(__name__)
+
 # Try to import camera module, but don't fail if cv2 is not available
 try:
     from hypemage.camera import CameraProcess, CameraInitializationError
     CAMERA_AVAILABLE = True
 except ImportError as e:
-    logger = get_logger(__name__)
     logger.warning(f"Camera module not available: {e}")
     logger.warning("Robot will run without camera support")
     CAMERA_AVAILABLE = False
@@ -40,7 +42,6 @@ try:
     from hypemage.dribbler_control import DribblerController
     DRIBBLER_AVAILABLE = True
 except ImportError as e:
-    logger = get_logger(__name__)
     logger.warning(f"Dribbler module not available: {e}")
     DRIBBLER_AVAILABLE = False
     DribblerController = None
@@ -50,7 +51,6 @@ try:
     from motors.motor import Motor
     MOTOR_AVAILABLE = True
 except ImportError as e:
-    logger = get_logger(__name__)
     logger.warning(f"Motor module not available: {e}")
     MOTOR_AVAILABLE = False
     Motor = None
@@ -59,12 +59,9 @@ try:
     from hypemage.kicker_control import KickerController
     KICKER_AVAILABLE = True
 except ImportError as e:
-    logger = get_logger(__name__)
     logger.warning(f"Kicker module not available: {e}")
     KICKER_AVAILABLE = False
     KickerController = None
-
-logger = get_logger(__name__)
 
 
 @dataclass

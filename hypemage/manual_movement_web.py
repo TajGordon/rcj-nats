@@ -3,7 +3,7 @@ Manual Movement Test - Web Visualization
 
 Interactive web interface to test motor movement with visual angle display.
 Click on the visualization to set direction, robot moves until space is pressed.
-Speed is fixed at 0.5 for all movements.
+Speed is fixed at 0.05 for all movements.
 
 Usage:
     python hypemage/manual_movement_web.py
@@ -17,20 +17,25 @@ import sys
 import asyncio
 import signal
 import base64
-import io
+import math
+from pathlib import Path
 from threading import Thread, Event
 from aiohttp import web
 import numpy as np
 import cv2
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from hypemage.motor_control import MotorController
 from hypemage.config import load_config
 from hypemage.logger import get_logger
+from hypemage.camera import CameraProcess
 
 logger = get_logger(__name__)
 
 # Global state
 motor_controller = None
+camera = None
 active_connections = set()
 current_angle = 0
 current_speed = 0.0
@@ -42,36 +47,52 @@ FIXED_SPEED = 0.05
 VIZ_SIZE = 640
 
 
-def create_visualization(angle, speed, is_moving):
-    """Create a visualization canvas showing the movement direction"""
-    # Create black canvas
-    viz = np.zeros((VIZ_SIZE, VIZ_SIZE, 3), dtype=np.uint8)
+def create_visualization_overlay(frame, angle, speed, is_moving, camera_obj):
+    """
+    Add visualization overlays to camera frame showing movement direction
     
-    center_x = VIZ_SIZE // 2
-    center_y = VIZ_SIZE // 2
-    radius = VIZ_SIZE // 2 - 50
+    Args:
+        frame: Camera frame (with mirror mask already applied)
+        angle: Current movement angle
+        speed: Current movement speed
+        is_moving: Whether robot is currently moving
+        camera_obj: CameraProcess instance for mirror info
+        
+    Returns:
+        Frame with angle guides and movement arrow overlaid
+    """
+    viz = frame.copy()
+    
+    # Get mirror circle info
+    if camera_obj.mirror_circle is None:
+        return viz
+    
+    center_x, center_y, radius = camera_obj.mirror_circle
     
     # Draw angle guide lines every 45 degrees
     angles_deg = [0, 45, 90, 135, 180, 225, 270, 315]
-    angle_labels = ['0°\nForward', '45°', '90°\nLeft', '135°', '180°\nBack', '225°', '270°\nRight', '315°']
+    angle_labels = ['0°', '45°', '90°', '135°', '180°', '225°', '270°', '315°']
     
     for angle_deg, label in zip(angles_deg, angle_labels):
-        # Convert to radians (0° = up/forward)
-        radians = np.radians(angle_deg - 90)
+        # Convert to radians (0° = up/forward, clockwise)
+        # Match the camera coordinate system
+        radians = math.radians(angle_deg - 90)
         
-        # Calculate line endpoints
-        start_x = int(center_x + np.cos(radians) * 30)
-        start_y = int(center_y + np.sin(radians) * 30)
-        end_x = int(center_x + np.cos(radians) * radius)
-        end_y = int(center_y + np.sin(radians) * radius)
+        # Calculate line endpoints (shorter lines, within mirror circle)
+        line_start_radius = radius * 0.15  # Start 15% from center
+        line_end_radius = radius * 0.85   # End at 85% to stay in circle
         
-        # Draw dashed line
-        color = (0, 255, 136)  # Green
+        start_x = int(center_x + np.cos(radians) * line_start_radius)
+        start_y = int(center_y + np.sin(radians) * line_start_radius)
+        end_x = int(center_x + np.cos(radians) * line_end_radius)
+        end_y = int(center_y + np.sin(radians) * line_end_radius)
+        
+        # Draw dashed line (green)
+        color = (0, 255, 136)
         thickness = 2
-        line_type = cv2.LINE_AA
         
         # Draw dashed line manually
-        num_dashes = 20
+        num_dashes = 15
         for i in range(num_dashes):
             if i % 2 == 0:  # Only draw every other segment
                 t1 = i / num_dashes
@@ -80,85 +101,65 @@ def create_visualization(angle, speed, is_moving):
                 y1 = int(start_y + (end_y - start_y) * t1)
                 x2 = int(start_x + (end_x - start_x) * t2)
                 y2 = int(start_y + (end_y - start_y) * t2)
-                cv2.line(viz, (x1, y1), (x2, y2), color, thickness, line_type)
+                cv2.line(viz, (x1, y1), (x2, y2), color, thickness, cv2.LINE_AA)
         
         # Draw angle label
-        label_x = int(center_x + np.cos(radians) * (radius + 35))
-        label_y = int(center_y + np.sin(radians) * (radius + 35))
+        label_radius = radius * 0.70  # Place labels at 70% radius
+        label_x = int(center_x + np.cos(radians) * label_radius)
+        label_y = int(center_y + np.sin(radians) * label_radius)
         
-        # Split label by newline
-        lines = label.split('\n')
-        for i, line in enumerate(lines):
-            text_size = cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-            text_x = int(label_x - text_size[0] // 2)
-            text_y = int(label_y + (i - 0.5) * 20)
-            
-            # Draw shadow
-            cv2.putText(viz, line, (text_x + 2, text_y + 2), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 3, cv2.LINE_AA)
-            # Draw text
-            cv2.putText(viz, line, (text_x, text_y), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2, cv2.LINE_AA)
-    
-    # Draw center circle
-    cv2.circle(viz, (center_x, center_y), 15, (0, 255, 136), 2, cv2.LINE_AA)
-    
-    # Draw center crosshair
-    cv2.line(viz, (center_x - 20, center_y), (center_x + 20, center_y), 
-             (0, 255, 136), 2, cv2.LINE_AA)
-    cv2.line(viz, (center_x, center_y - 20), (center_x, center_y + 20), 
-             (0, 255, 136), 2, cv2.LINE_AA)
+        text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+        text_x = int(label_x - text_size[0] // 2)
+        text_y = int(label_y + text_size[1] // 2)
+        
+        # Draw shadow
+        cv2.putText(viz, label, (text_x + 2, text_y + 2), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 3, cv2.LINE_AA)
+        # Draw text
+        cv2.putText(viz, label, (text_x, text_y), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
     
     # Draw current direction arrow if moving
     if is_moving and speed > 0:
-        # Convert angle to radians (0° = up/forward)
-        radians = np.radians(angle - 90)
+        # Convert angle to radians (match camera coordinate system)
+        radians = math.radians(angle - 90)
         
         # Arrow properties
-        arrow_length = radius * 0.8
-        arrow_start_x = int(center_x + np.cos(radians) * 20)
-        arrow_start_y = int(center_y + np.sin(radians) * 20)
-        arrow_end_x = int(center_x + np.cos(radians) * arrow_length)
-        arrow_end_y = int(center_y + np.sin(radians) * arrow_length)
+        arrow_start_radius = radius * 0.2
+        arrow_end_radius = radius * 0.75
         
-        # Draw thick arrow
+        arrow_start_x = int(center_x + np.cos(radians) * arrow_start_radius)
+        arrow_start_y = int(center_y + np.sin(radians) * arrow_start_radius)
+        arrow_end_x = int(center_x + np.cos(radians) * arrow_end_radius)
+        arrow_end_y = int(center_y + np.sin(radians) * arrow_end_radius)
+        
+        # Draw thick orange arrow
         cv2.arrowedLine(viz, (arrow_start_x, arrow_start_y), (arrow_end_x, arrow_end_y),
-                       (0, 165, 255), 8, cv2.LINE_AA, tipLength=0.15)  # Orange arrow
+                       (0, 165, 255), 6, cv2.LINE_AA, tipLength=0.2)  # Orange arrow
         
-        # Draw angle text at center
+        # Draw angle text near center
         angle_text = f"{angle:.0f}°"
-        text_size = cv2.getTextSize(angle_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3)[0]
+        text_size = cv2.getTextSize(angle_text, cv2.FONT_HERSHEY_SIMPLEX, 1.2, 3)[0]
         text_x = int(center_x - text_size[0] // 2)
-        text_y = int(center_y + text_size[1] // 2)
+        text_y = int(center_y - radius * 0.15)  # Slightly above center
         
         # Draw shadow
         cv2.putText(viz, angle_text, (text_x + 3, text_y + 3), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 5, cv2.LINE_AA)
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 0), 5, cv2.LINE_AA)
         # Draw text
         cv2.putText(viz, angle_text, (text_x, text_y), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 165, 255), 3, cv2.LINE_AA)
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 165, 255), 3, cv2.LINE_AA)
     
-    # Draw status text
+    # Draw status text (top left)
     status_text = "MOVING" if is_moving else "STOPPED"
     status_color = (0, 255, 0) if is_moving else (100, 100, 100)
     cv2.putText(viz, status_text, (20, 40), 
-               cv2.FONT_HERSHEY_SIMPLEX, 1.2, status_color, 3, cv2.LINE_AA)
+               cv2.FONT_HERSHEY_SIMPLEX, 1.0, status_color, 3, cv2.LINE_AA)
     
     # Draw speed text
     speed_text = f"Speed: {speed:.2f}"
-    cv2.putText(viz, speed_text, (20, 80), 
-               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
-    
-    # Draw instructions at bottom
-    instructions = [
-        "Click anywhere to move in that direction",
-        "Press SPACE to stop movement"
-    ]
-    y_pos = VIZ_SIZE - 60
-    for instruction in instructions:
-        cv2.putText(viz, instruction, (20, y_pos), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1, cv2.LINE_AA)
-        y_pos += 30
+    cv2.putText(viz, speed_text, (20, 75), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
     
     return viz
 
@@ -485,15 +486,43 @@ async def index_handler(request):
 
 
 async def frame_broadcaster():
-    """Continuously create and broadcast visualization frames"""
+    """Continuously capture camera frames and broadcast with visualization overlays"""
+    global camera
+    
     while not stop_event.is_set():
         try:
             if not active_connections:
                 await asyncio.sleep(0.1)
                 continue
             
-            # Create visualization
-            viz = create_visualization(current_angle, current_speed, is_moving)
+            if camera is None:
+                await asyncio.sleep(0.1)
+                continue
+            
+            # Capture frame from camera
+            frame = camera.capture_frame()
+            if frame is None:
+                await asyncio.sleep(0.01)
+                continue
+            
+            # Update mirror mask
+            camera.update_mirror_mask(frame)
+            
+            # Apply mirror mask to frame
+            viz = frame.copy()
+            if camera.mirror_circle and camera.mirror_mask is not None:
+                viz = cv2.bitwise_and(viz, viz, mask=camera.mirror_mask)
+                
+                # Draw mirror circle outline
+                cx, cy, r = camera.mirror_circle
+                cv2.circle(viz, (cx, cy), r, (0, 255, 0), 2)
+            
+            # Add visualization overlays (angle guides, movement arrow)
+            viz = create_visualization_overlay(viz, current_angle, current_speed, is_moving, camera)
+            
+            # Rotate and flip image for proper orientation (like mirror visualization)
+            viz = cv2.rotate(viz, cv2.ROTATE_180)
+            viz = cv2.flip(viz, 1)  # Horizontal flip
             
             # Encode as JPEG
             _, jpg = cv2.imencode('.jpg', viz, [cv2.IMWRITE_JPEG_QUALITY, 90])
@@ -548,17 +577,27 @@ def signal_handler(sig, frame):
 
 
 def main():
-    global motor_controller
+    global motor_controller, camera
     
     print("=" * 60)
     print("Manual Movement Control - Web Interface")
     print("=" * 60)
-    print("\nInitializing motor controller...")
     
     # Load config
     config = load_config()
     
+    # Initialize camera
+    print("\nInitializing camera...")
+    try:
+        camera = CameraProcess(config=config, threaded=False)
+        print("✓ Camera initialized")
+    except Exception as e:
+        print(f"✗ Failed to initialize camera: {e}")
+        print("Cannot continue without camera")
+        sys.exit(1)
+    
     # Initialize motor controller
+    print("\nInitializing motor controller...")
     try:
         motor_controller = MotorController(config=config, threaded=True)
         print("✓ Motor controller initialized\n")
